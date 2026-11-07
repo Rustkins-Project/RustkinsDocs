@@ -54,8 +54,8 @@ Les skills peuvent calculer `eligible_for_resolved` et `eligible_for_closed` com
 
 ### 1.4. Journal des interventions (RustkinsActivity)
 
-Les agents suivent le [plan transverse du journal](activity-journal-integration.md) et les [règles canoniques](https://github.com/Rustkins-Project/RustkinsActivity/blob/main/docs/activity-workflow.md). Ils recherchent les brouillons et activités ouvertes avant de créer ; reprennent automatiquement une correspondance claire, mais ne modifient jamais `completed` ou `abandoned`. Le nouveau `repositories` contient un ou plusieurs dépôts, et une intervention rapide peut être enregistrée directement `completed`.
+Les agents suivent le [guide opérationnel transversal](activity-journal-integration.md) et les [règles canoniques](https://github.com/Rustkins-Project/RustkinsActivity/blob/main/docs/activity-workflow.md). Le skill partagé est publié dans [RustkinsSkills](https://github.com/Rustkins-Project/RustkinsSkills). Ils recherchent les brouillons et activités ouvertes avant de créer ; reprennent automatiquement une correspondance claire, mais ne modifient jamais `completed` ou `abandoned`. Le nouveau `repositories` contient un ou plusieurs dépôts, et une intervention rapide peut être enregistrée directement `completed`.
 
-Le futur outil local partagé effectuera la validation et la publication Git sous verrou court ; il n'est pas encore développé. Une publication d'activité ne crée ni ne clôture un work item Azure et la fin d'une session IA ne clôture pas l'activité.
+La CLI RustkinsActivity implémente aujourd'hui la validation, les brouillons, le verrou local court, la publication Git et la récupération ; Codex et Claude Code partagent sa configuration. Une publication d'activité ne crée ni ne clôture un work item Azure et la fin d'une session IA ne clôture pas l'activité.
 
 ---
