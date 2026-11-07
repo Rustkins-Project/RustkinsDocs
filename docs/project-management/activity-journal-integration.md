@@ -1,98 +1,75 @@
 ---
 id: DOC-0032
-title: "Intégration du journal RustkinsActivity au workflow de l'équipe"
+title: "Intégration opérationnelle de RustkinsActivity"
 type: project-management
 status: draft
-summary: "Règles transverses entre Azure Boards, GitHub, RustkinsActivity et les agents IA ; scénarios et plan de mise en œuvre du workflow hybride."
+summary: "Utilisation actuelle de RustkinsActivity et RustkinsSkills avec GitHub, Azure Boards et les rapports Discord ; responsabilités, granularité et limites."
 topics: [activity, agents, github, azure-boards, automation]
 applies_to: [all]
 references:
   - "https://github.com/Rustkins-Project/RustkinsActivity"
+  - "https://github.com/Rustkins-Project/RustkinsSkills"
   - "https://github.com/Rustkins-Project/RustkinsDiscordBot"
 ---
 
-# Intégration de RustkinsActivity au workflow de l'équipe
+# Intégration opérationnelle de RustkinsActivity
 
-> **Document en `draft` jusqu'à validation humaine.** Il synthétise les décisions d'équipe et planifie leur automatisation ; les outils de publication et les skills décrits ici ne sont pas encore développés. Le **contrat canonique du journal** demeure dans [RustkinsActivity](https://github.com/Rustkins-Project/RustkinsActivity).
+> **La solution est implémentée** dans RustkinsActivity et RustkinsSkills. Le statut documentaire `draft` ci-dessus concerne la revue formelle du présent guide et ne signifie pas que les outils sont encore à développer. Ce document décrit uniquement les responsabilités **transverses** ; les contrats techniques restent dans leurs dépôts respectifs.
 
 ## 1. Sources de vérité
 
-| Système | Responsabilité |
+| Sujet | Source canonique |
 | --- | --- |
-| Azure Boards | Epics, Features, US, Tasks, Bugs, sprints, états officiels, DoD et validation |
-| Dépôts GitHub | Code, commits, PR et reviews |
-| RustkinsDocs | Spécifications, ADR, conventions et connaissance durable |
-| RustkinsActivity | Chronologie, résultats et blocages des interventions individuelles (humains et agents) |
-| RustkinsDiscordBot | Questions à l'équipe et récapitulatif quotidien des activités **publiées sur `main`** |
+| Backlog, work items, états, itérations, DoD et Sprint Review | Azure Boards |
+| Code, branches, PR, reviews et CI | GitHub |
+| Interventions et résultats individuels | [RustkinsActivity](https://github.com/Rustkins-Project/RustkinsActivity) |
+| Spécifications, ADR, connaissance et conventions | RustkinsDocs |
+| Installation et usage des agents Codex/Claude Code | [RustkinsSkills](https://github.com/Rustkins-Project/RustkinsSkills) |
+| Questions à l'équipe et rapports quotidiens d'activité | [RustkinsDiscordBot](https://github.com/Rustkins-Project/RustkinsDiscordBot) |
 
-**Une activité n'est pas une US, une Task Azure, une PR ou une session IA**. Une intervention cohérente d'un responsable peut impliquer plusieurs dépôts (`repositories`), plusieurs PR, plusieurs jours ou plusieurs sessions Codex/Claude Code. Une Task peut avoir plusieurs activités ; une PR peut être citée par plusieurs activités. Le champ `work_item_id` vise le work item Azure principal ou vaut `null`, sans création automatique de ticket.
+RustkinsDiscordBot **lit** les fiches d'Activity publiées sur `main` : il n'en crée ni n'en clôture. RustkinsSkills **oriente** Codex et Claude Code ; la CLI Rust de RustkinsActivity réalise la validation, la préparation et la publication Git.
 
-Les règles Azure existantes restent souveraines : une Task ne devient `Closed` qu'après sa DoD, et une US ne devient `Closed` qu'après validation humaine pendant la Sprint Review. Le statut d'une activité ne doit **jamais déclencher automatiquement** de changement d'état Azure. Les PR continuent d'utiliser `AB#123` pour les liaisons Azure reconnues par l'application Azure Boards for GitHub ; les liens d'activité ne remplacent pas cette convention.
+## 2. Interventions et liens Azure Boards
 
-## 2. Granularité, reprise et clôture
+Une activité est une **intervention cohérente par responsable humain**, pas une session IA, une Task Azure ou une PR. Elle peut regrouper plusieurs sessions, plusieurs dépôts (`repositories`) et plusieurs PR. Plusieurs développeurs peuvent référencer le même work item avec leurs activités respectives ; le champ `work_item_id` vise le work item principal, ou vaut `null` lorsqu'aucun ticket n'est nécessaire.
 
-- **Une activité = une intervention cohérente par responsable humain** (Timothy, Alexis ou Loick). La durée ou le nombre de dépôts ne constitue pas un critère de découpage.
-- Énoncer dès le début objectif, périmètre et **condition de fin**. Une évolution cohérente est autorisée tant que l'activité est ouverte, avec modification du Résumé et trace au Journal. Un nouveau travail indépendant exige une autre activité.
-- Rechercher en priorité les **brouillons locaux non publiés**, puis les activités ouvertes du responsable : si correspondance claire, reprise automatique par l'agent ; ambiguïté réelle, demander confirmation. Même work item/dépôt ≠ même activité.
-- Statuts de journal : `in_progress`, `paused` (suspension volontaire), `blocked` (dépendance vérifiée), `completed` et `abandoned`. Une fin de conversation ne change pas le statut.
-- **Immutabilité totale** dès la publication de `completed` ou `abandoned`. Ni correction, ni nouvelle PR, ni réouverture sur l'ancienne fiche : nouvelle activité et référence à l'original si nouveau travail ou erratum.
-- Par défaut, clôturer quand le travail prévu est réalisé, vérifié et le livrable publié (par exemple une PR ouverte). **Merge/review ne sont attendus que si le périmètre l'exige explicitement**. Une review après clôture donnant lieu à du travail crée donc une nouvelle activité, même liée à la même PR.
-- Une correction très courte peut produire **directement une activité `completed`**, avec les vraies dates. Pour une intervention significative, créer/publier `in_progress` dès le démarrage et mettre à jour aux étapes utiles.
-- Un blocage sur Discord se note dans le journal avec contexte et action attendue ; le retour à `in_progress` n'intervient qu'une fois le blocage réellement levé.
+Le périmètre et la condition de fin sont définis au démarrage, puis peuvent évoluer **sur une activité ouverte**, avec une trace dans le Journal. Une intervention brève peut être publiée directement `completed`. Par défaut, `completed` signifie travail vérifié et livrable publié ; review et merge ne sont attendus que s'ils font partie du périmètre. Une nouvelle correction de review après clôture implique une **nouvelle activité**, l'ancienne restant intégralement immuable. `abandoned` est également terminal et immuable.
 
-## 3. Politique de publication Git hybride
+Les statuts d'activité (`in_progress`, `paused`, `blocked`, `completed`, `abandoned`) ne synchronisent **jamais** automatiquement `System.State` dans Azure Boards. Une Task respecte sa DoD et une US n'est `Closed` qu'après validation humaine en Sprint Review, selon les [règles d'équipe](definition-of-done-and-tests.md). Les PR utilisent `AB#123` dans leur description pour la liaison Azure Boards–GitHub ; une simple référence dans une activité ne remplace pas ce lien.
 
-Les fiches Markdown d'activité sous `activities/` sont publiées directement sur `main` après vérification locale. **Schéma, template, conventions, scripts et hooks** passent par branche + **PR et relecture humaine** ; l'équipe ne met pas en place de CI ni de règles de branches complexes pour ce journal à ce stade.
+## 3. Workflow opérationnel des agents
 
-Chaque développeur dispose **d'un clone local RustkinsActivity partagé par Codex et Claude Code**. Les agents préparent des **brouillons d'opérations ciblées hors du clone**. Un outil commun (futur) détient un verrou **interprocessus court** uniquement pendant la transaction de publication.
+Les trois développeurs installent [RustkinsSkills](https://github.com/Rustkins-Project/RustkinsSkills#installation-windows-et-linux) sur leur poste avec leur profil humain et leur login GitHub, **un clone RustkinsActivity partagé par Codex et Claude Code sur ce poste**, et un dossier de brouillons local hors clone.
 
-Séquence envisagée : prévalidation du brouillon → verrou → état Git connu → `fetch` et `pull --ff-only` → vérification de version du fichier → application ciblée → indexation du seul fichier → validation complète et `pre-commit` → commit → push immédiat → vérification sur `origin/main` → libération du verrou.
+À chaque intervention, le skill exécute `recover` puis `discover`, consulte les brouillons et activités ouvertes du profil, reprend une correspondance claire sans demander, crée si aucune activité correspond, et demande confirmation **uniquement en cas d'ambiguïté**. Une activité terminale ne sert qu'au contexte.
 
-- **Pas de pull automatique chaque minute**, pas de `git add .` aveugle, de `--no-verify`, de `reset --hard` automatique, ni de `push --force`.
-- Une modification locale inconnue ou un état Git ambigu bloque la transaction sans suppression.
-- Le verrou ne couvre pas les autres postes : en cas de push non-fast-forward, récupérer `origin/main`, puis **reconstituer** le commit depuis le brouillon si les opérations restent compatibles. Sinon, signaler un conflit.
-- Les brouillons ont un ID stable, un contexte de base et un état local récupérable. Un commit local n'est **pas** une publication : seul `origin/main` confirme l'état `published`.
-- Les opérations ciblées sont `create`, `append_journal`, `add_reference`, `add_repository`, `set_status`, `replace_section` et `set_metadata`. Elles sont idempotentes lorsque cela est sûr et appliquées atomiquement par activité. Aucune **deuxième recherche sémantique de doublons sous verrou** ; on conserve les contrôles techniques de concurrence.
-- Le `pre-commit` local est obligatoire **par convention d'agent**, non par GitHub. Sans CI ni protection serveur, une écriture manuelle qui contourne le hook n'est pas empêchée ; ce compromis est accepté.
+Les opérations `prepare-create` / `prepare-patch` enregistrent un brouillon durable. `publish` prend un verrou **interprocessus local court**, synchronise la dernière version de `origin/main`, applique les changements ciblés compatibles, vérifie le schéma et le hook pré-commit, committe et pousse. La publication n'est confirmée qu'après lecture de `origin/main` ; `recover` gère les interruptions connues et les erreurs sont signalées sans écrasement destructeur.
 
-Voir les règles détaillées dans [le cycle de vie](https://github.com/Rustkins-Project/RustkinsActivity/blob/main/docs/activity-workflow.md) et [le contrat de publication](https://github.com/Rustkins-Project/RustkinsActivity/blob/main/docs/publication-contract.md). Ne pas dupliquer la spécification d'outillage dans RustkinsDocs.
+**Pas de seconde recherche sémantique sous verrou**, pas de synchronisation périodique en arrière-plan, pas de modification directe des fichiers du journal par l'agent, pas de push forcé ni de contournement de hook. Les fiches sont poussées directement sur `main` ; les **changements structurels** (Rust, schéma, conventions, templates) passent par PR et revue humaine. Aucun CI obligatoire n'a été ajouté pour ces fiches.
 
-## 4. Scénarios bout en bout
+## 4. Scénarios de référence
 
-| Scénario | Trajet attendu |
+| Cas | Comportement |
 | --- | --- |
-| Petite correction sans ticket | Recherche → correction et vérifications → `create completed` → hook + commit + push → digest du bot |
-| US sur plusieurs jours | Work item Azure existant si pertinent → `in_progress` → plusieurs publications du journal/tests/PR → clôture à la condition de fin |
-| Session IA interrompue | Brouillon conservé → reprise par le même agent ou l'autre → pas de nouvel `activity_id` |
-| Plusieurs développeurs, même sujet | Une activité par responsable, éventuel même `work_item_id` et mêmes références PR |
-| Question Discord bloquante | `blocked` + URL/contexte → vérifier la réponse → `in_progress` puis progression |
-| Review après clôture | Nouvelle activité liée à l'ancienne, même PR possible, ancienne immuable |
-| Intervention sur plusieurs dépôts | Une activité, tableau `repositories` non vide, références aux PR concernées |
+| Correction rapide hors Azure | Recherche puis fiche directement `completed`, avec vérifications réelles |
+| Fonctionnalité répartie sur plusieurs sessions | Une activité ouverte et enrichie jusqu'au livrable convenu |
+| Codex puis Claude Code | Même activité et même dossier de brouillons du développeur |
+| Plusieurs responsables sur la même Task | Activité distincte pour chaque personne |
+| Intervention sur plusieurs dépôts | Une fiche avec plusieurs éléments dans `repositories` |
+| Question bloquante sur Discord | `blocked` et lien/action attendue, reprise une fois le blocage réellement levé |
+| Retour de review après clôture | Nouvelle fiche reliée à l'intervention initiale |
+| Échec Git ou crash | Brouillon conservé ; reprise avec `recover` et sans faux succès distant |
 
-## 5. Plan d'implémentation transversal
+## 5. Périmètre et références
 
-| Phase | Dépôt | Livrable et validation attendue |
-| --- | --- | --- |
-| **0 — Contrat** | **RustkinsActivity** | `repository` → `repositories` (min. 1 dépôt unique), template et documentation. Tester exemples mono/multidépôts. |
-| **1 — Validation** | **RustkinsActivity** | Validateur YAML/frontmatter JSON Schema, cohérence chemin/identité/dates/statuts et immutabilité ; hook `pre-commit` installé par setup. Tests sur les versions **indexées**. |
-| **2 — Brouillons** | **RustkinsActivity** | Opérations ciblées idempotentes, état local hors clone, comparaison par `blob_sha`, hash de section et transition attendue. Tests unitaires de conflits. |
-| **3 — Git/recovery** | **RustkinsActivity** | Verrou OS, synchronisation FF, validation, commit/push, récupération après crash, rejet de push distant ; tests de deux agents / deux clones. |
-| **4 — Skills** | **Futur dépôt de skills** | Adaptateurs Codex et Claude Code vers un outil commun, configuration des trois profils ; recherche/reprise et usage transparent. **Aucun dépôt créé maintenant.** |
-| **5 — Bot (option)** | **RustkinsDiscordBot** | Ignorer et signaler individuellement une fiche invalide plutôt que perdre tout le récapitulatif ; liens enrichis vers activités. |
+Ce workflow journalise les interventions **sans dupliquer le backlog Azure**, ne prétend pas détecter toutes les correspondances sémantiques de façon déterministe, et ne remplace pas l'approbation humaine d'une ADR ou d'une US. La synchronisation vers Discord est **une lecture des publications sur `main`**, pas une écriture du bot dans le journal.
 
-Le futur dépôt de skills contiendra uniquement la **distribution et les instructions pour les agents**, pas une seconde implémentation des règles de Git ou de validation. Interface conceptuelle à considérer : `find`, `prepare`, `validate`, `publish`, `recover`, `status`. Éviter service permanent, base de données ou ordonnancement par minute.
+Le format, les invariants et les détails techniques sont documentés dans :
 
-## 6. Recette et exclusions
+- [RustkinsActivity — cycle de vie](https://github.com/Rustkins-Project/RustkinsActivity/blob/main/docs/activity-workflow.md)
+- [RustkinsActivity — contrat de publication](https://github.com/Rustkins-Project/RustkinsActivity/blob/main/docs/publication-contract.md)
+- [RustkinsActivity — CLI des agents](https://github.com/Rustkins-Project/RustkinsActivity/blob/main/docs/agent-cli.md)
+- [RustkinsSkills — installation et skill](https://github.com/Rustkins-Project/RustkinsSkills)
+- [Règles de gestion Azure et agents](agent-workflow.md) · [DoD et revue](definition-of-done-and-tests.md)
 
-Les tests de bout en bout doivent couvrir : validation d'un tableau multi-dépôts, frontmatter invalide, activité directement terminale, évolution d'objectif tracée, reprise automatique après interruption, publication concurrente sur deux fichiers, collision de statut sur un même fichier, événement/PR sans doublons, crash avant/après commit, timeout de push, refus de modification d'une fiche terminale, blocage Discord et séparation Azure/Activity.
-
-Les critères d'acceptation du chantier : un journal publiable depuis les deux agents sans duplications intentionnelles, aucune écriture concurrente silencieusement perdue, aucun faux succès GitHub, aucune activité terminale modifiée, aucune clôture Azure implicite, et une lecture par le bot de `main` préservée.
-
-**Hors périmètre de ces PR** : développement des scripts, de la CLI, des skills, du hook, d'une CI et de règles de branches GitHub complexes. Les nouveaux liens vers RustkinsActivity seront disponibles sur `main` après fusion de sa PR complémentaire.
-
-## 7. Sources
-
-- [RustkinsActivity — convention et cycle de vie](https://github.com/Rustkins-Project/RustkinsActivity/blob/main/docs/activity-workflow.md)
-- [RustkinsActivity — contrat brouillons/Git](https://github.com/Rustkins-Project/RustkinsActivity/blob/main/docs/publication-contract.md)
-- [RustkinsActivity — plan d'implémentation et tests](https://github.com/Rustkins-Project/RustkinsActivity/blob/main/docs/implementation-plan.md)
-- [Règles des agents](agent-workflow.md) · [DoD Azure](definition-of-done-and-tests.md) · [Gouvernance](principles-and-governance.md)
+Le document reste en `draft` tant que sa validation documentaire selon les conventions RustkinsDocs n'est pas formalisée ; son passage à `approved` requiert la revue appropriée.
