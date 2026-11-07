@@ -2,7 +2,7 @@
 id: DOC-0032
 title: "Intégration opérationnelle de RustkinsActivity"
 type: project-management
-status: draft
+status: approved
 summary: "Utilisation actuelle de RustkinsActivity et RustkinsSkills avec GitHub, Azure Boards et les rapports Discord ; responsabilités, granularité et limites."
 topics: [activity, agents, github, azure-boards, automation]
 applies_to: [all]
@@ -14,7 +14,7 @@ references:
 
 # Intégration opérationnelle de RustkinsActivity
 
-> **La solution est implémentée** dans RustkinsActivity et RustkinsSkills. Le statut documentaire `draft` ci-dessus concerne la revue formelle du présent guide et ne signifie pas que les outils sont encore à développer. Ce document décrit uniquement les responsabilités **transverses** ; les contrats techniques restent dans leurs dépôts respectifs.
+> **Document approuvé** : le workflow RustkinsActivity / RustkinsSkills est implémenté et validé par l'équipe. Ce guide décrit les responsabilités **transverses** ; les contrats techniques restent dans leurs dépôts respectifs.
 
 ## 1. Sources de vérité
 
@@ -72,4 +72,4 @@ Le format, les invariants et les détails techniques sont documentés dans :
 - [RustkinsSkills — installation et skill](https://github.com/Rustkins-Project/RustkinsSkills)
 - [Règles de gestion Azure et agents](agent-workflow.md) · [DoD et revue](definition-of-done-and-tests.md)
 
-Le document reste en `draft` tant que sa validation documentaire selon les conventions RustkinsDocs n'est pas formalisée ; son passage à `approved` requiert la revue appropriée.
+**Statut documentaire : `approved`**, à la suite de la validation humaine du workflow et de cette actualisation. Les modifications ultérieures continuent de suivre les conventions de revue de RustkinsDocs.
