@@ -19,12 +19,14 @@ applies_to: [all]
 3. Configurer les **colonnes homonymes `Blocked` et `On Hold`** sur le Board des US et vérifier leur correspondance avec les nouveaux états ; examiner séparément les colonnes créées ou affichées sur le **Taskboard des sprints**.
 4. Vérifier les états des US : `New`, `Active`, `Blocked`, `On Hold`, `Resolved`, `Closed` ; si `Resolved` n'est pas présent, l'ajouter en catégorie **Resolved**. Vérifier ceux des Tasks : `New`, `Active`, `Blocked`, `On Hold`, `Closed`. Confirmer le comportement des changements d'état sur des work items de test avant l'automatisation.
 5. Disposer de **Story Points** et de **Business Value (1–10)** pour les US. **Aucun champ d'estimation horaire spécifique n'est nécessaire** pour les US ni les Tasks.
-6. Installer/configurer **Azure Boards pour GitHub** sur les dépôts concernés ; valider l'association PR ↔ work item avec `AB#<id>`.
-7. Ajouter une **CI de contrôle des liens PR ↔ work items** : refuser une PR sans lien Azure valide, sans pour autant provoquer une clôture automatique de l'US.
+6. Installer/configurer **Azure Boards pour GitHub** sur tous les dépôts concernés ; valider la liaison par `AB#<id>` et les transitions `Closed AB#<task>` / `Resolved AB#<us>` **au merge vers la branche par défaut**, sur de vrais work items de **test**.
+7. Prévoir éventuellement à terme une **CI supplémentaire** de contrôle des liens PR ↔ work items. **Pas de GitHub Actions personnalisé pour la clôture** au premier lot : les transitions natives sont utilisées et la review/les checks existants contrôlent la qualité. En aucun cas la PR ne doit passer une US directement à `Closed`.
 8. Définir les **preuves de DoD** lisibles par les skills : trois types de tests verts, Tasks `Closed`, version déployée sur plateforme de test, AC vérifiés, liens PR et documentation.
 9. Prévoir la traçabilité de la **validation collective durant la Sprint Review** dans le compte rendu et, selon les possibilités Azure, dans un commentaire ou un champ de référence.
 10. Créer les vues/requêtes de suivi nécessaires : US `Resolved`, US non terminées en fin de sprint, PR non liées, Bugs, dépendances et éléments dont **`System.State` vaut `Blocked` ou `On Hold`**. Contrôler aussi l'affichage de ces états dans les colonnes du Board et du Taskboard.
 11. Tester chaque opération de lecture/modification sur des work items de test, et vérifier les permissions avant de l'autoriser à un agent.
+
+> **Règle d'exploitation :** les PR intermédiaires ne résolvent pas leur US ; seule la dernière PR **mergée**, avec preuves DoD complètes et toutes les autres PR intégrées, peut demander `Resolved AB#<us-id>`. Si déploiement et E2E ne sont vérifiables qu'après merge, conserver `AB#<us-id>` et résoudre plus tard par `az`. Voir [le modèle opérationnel des skills](agent-skills-operating-model.md).
 
 > **Note technique :** Rustkins choisit volontairement **de vrais états `System.State` ET leurs colonnes homonymes** pour `Blocked` et `On Hold`. Une colonne personnalisée n'est pas en elle-même un état ; il faut donc créer les états dans le processus hérité, les associer au Board, et vérifier leur représentation sur le Taskboard.
 
