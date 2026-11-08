@@ -3,7 +3,7 @@ id: DOC-0040
 title: "Modèle opérationnel des skills Codex et Claude Code"
 type: project-management
 status: approved
-summary: "Responsabilités des skills locaux, autonomie de développement, gestion des Tasks, références Azure Boards dans les PR et futurs workflows de sprint."
+summary: "Responsabilités des huit skills locaux, autonomie de développement, gestion des Tasks, références Azure Boards dans les PR et workflows de sprint."
 topics: [agents, skills, azure-boards, github, sprint, governance]
 applies_to: [all]
 references:
@@ -14,7 +14,7 @@ references:
 
 # Modèle opérationnel des skills Codex et Claude Code
 
-> Ce document précise les décisions d'équipe pour le **futur workflow des agents**. Il ne signifie pas que tous les skills et scripts sont déjà livrés. Le détail technique et le plan d'implémentation vivent dans [RustkinsSkills](https://github.com/Rustkins-Project/RustkinsSkills/blob/main/docs/implementation-plan.md).
+> Ce document précise les décisions d'équipe appliquées par les **huit skills disponibles** dans [RustkinsSkills](https://github.com/Rustkins-Project/RustkinsSkills). Le [bilan des jalons et des recettes](https://github.com/Rustkins-Project/RustkinsSkills/blob/main/docs/implementation-plan.md) distingue leur implémentation de la validation encore attendue sur une itération de sprint réelle.
 
 ## 1. Sources de vérité, outils et périmètre
 
@@ -25,7 +25,7 @@ references:
 - **RustkinsDiscordBot** : questions de l'agent à l'équipe et réponses humaines validées, via **API privée** du bot.
 - **RustkinsMCP** : historique du travail réalisé, **hors architecture opérationnelle cible** ; ni dépendance ni journal d'Activity partagé.
 
-Les appels API directs sont autorisés lorsque la CLI ne couvre pas correctement le besoin ; ils doivent être ciblés et justifiés. Aucun nouveau serveur MCP n'est requis. Les cinq skills du premier lot sont `rustkins-activity`, `rustkins-boards`, `rustkins-work`, `rustkins-ask-team` et `rustkins-knowledge`. Les trois skills dédiés aux sprints (`planning`, `status`, `close`) viendront après leur socle commun.
+Les appels API directs sont autorisés lorsque la CLI ne couvre pas correctement le besoin ; ils doivent être ciblés et justifiés. Aucun nouveau serveur MCP n'est requis. Les cinq skills du premier lot sont `rustkins-activity`, `rustkins-boards`, `rustkins-work`, `rustkins-ask-team` et `rustkins-knowledge`. Les trois skills de sprint disponibles sont `rustkins-sprint-planning`, `rustkins-sprint-status` et `rustkins-sprint-close`.
 
 Les skills partagent une configuration locale et des scripts lorsque c'est utile, **sans versionnement individuel des skills**. Prendre en charge le français et les accents de bout en bout (UTF-8, en particulier Windows/PowerShell).
 
@@ -82,6 +82,6 @@ Aucun skill n'attend un Daily obligatoire ni une présence constante. Les questi
 
 ## 7. Validation de cette stratégie
 
-Avant déploiement des nouveaux skills : tester sur des work items de **test**, pas sur les données métier, un lien seul `AB#`, une transition `Closed`, une transition `Resolved`, une PR mergée hors branche par défaut, un ordre de merge défavorable et un échec de mise à jour d'état. Contrôler les statuts effectivement persistés.
+La recette intégrée a utilisé des work items du projet Azure **Test** : lien PR, `Closed` d'une Task et `Resolved` d'une US ont été contrôlés après merge ; une réponse Discord validée a aussi été relue. Pour une nouvelle configuration, tester les transitions sur des work items de test, notamment un merge hors branche par défaut, un ordre de merge défavorable et un échec de mise à jour d'état. Contrôler les statuts effectivement persistés. Les workflows de sprint ont des tests automatisés, mais pas encore de recette complète sur une itération réelle avec review.
 
-Le plan de développement et les tests par skill sont documentés dans [RustkinsSkills](https://github.com/Rustkins-Project/RustkinsSkills/blob/main/docs/implementation-plan.md).
+Le bilan de livraison et les scénarios de recette par skill sont documentés dans [RustkinsSkills](https://github.com/Rustkins-Project/RustkinsSkills/blob/main/docs/implementation-plan.md).

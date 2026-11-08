@@ -86,7 +86,7 @@ Les modifications structurantes des spécifications, de l'architecture et des co
 3. Lire **seulement les fichiers pertinents**, plutôt que charger toute la base de connaissances.
 4. Lorsqu'une découverte mérite une conservation durable, rechercher d'abord la note existante. Proposer son enrichissement ou une création sous `knowledge/`.
 5. Pour un changement de conception, proposer une ADR et demander la validation appropriée ; ne pas publier une décision acceptée sans revue humaine.
-6. Pour une décision Discord, le skill récupérera la réponse via l'API du bot, préparera l'ADR et sa PR ; il ne considérera pas une réponse en base comme une ADR déjà officielle.
+6. Pour une décision Discord, le skill récupère la réponse via l'API du bot, prépare l'ADR et sa PR ; il ne considère pas une réponse en base comme une ADR déjà officielle.
 7. Préserver les références vers Azure Boards et GitHub ; éviter les journaux détaillés ou transcriptions.
 8. Ne jamais committer des secrets, credentials, données personnelles inutiles ou contenu sensible.
 

@@ -3,7 +3,7 @@ id: DOC-0031
 title: "Configuration Azure DevOps et références techniques"
 type: project-management
 status: approved
-summary: "Configuration Azure Boards pour les futurs skills, liens GitHub et références Microsoft Learn."
+summary: "Configuration Azure Boards pour les skills disponibles, liens GitHub et références Microsoft Learn."
 topics: [azure-devops, configuration, github, integration]
 applies_to: [all]
 ---
@@ -12,10 +12,10 @@ applies_to: [all]
 
 [Retour au sommaire de gestion de projet](README.md)
 
-## 1. Configuration Azure DevOps pour les futurs skills
+## 1. Configuration Azure DevOps pour les skills
 
 1. Confirmer le projet Azure Boards, son processus Agile et la disponibilité des work item types `Epic`, `Feature`, `User Story`, `Task`, `Bug` et `Issue` ; configurer les Bugs au niveau des US dans le Product Backlog (**Bugs as requirements**), conformément à la politique de suivi validée.
-2. Dans le **processus Agile hérité**, créer les états **`Blocked` et `On Hold` sur les US et les Tasks**, tous deux en catégorie système **In Progress**. Les deux états doivent être visibles dans le champ Azure `System.State` et requêtables par les futurs skills.
+2. Dans le **processus Agile hérité**, créer les états **`Blocked` et `On Hold` sur les US et les Tasks**, tous deux en catégorie système **In Progress**. Les deux états doivent être visibles dans le champ Azure `System.State` et requêtables par les skills.
 3. Configurer les **colonnes homonymes `Blocked` et `On Hold`** sur le Board des US et vérifier leur correspondance avec les nouveaux états ; examiner séparément les colonnes créées ou affichées sur le **Taskboard des sprints**.
 4. Vérifier les états des US : `New`, `Active`, `Blocked`, `On Hold`, `Resolved`, `Closed` ; si `Resolved` n'est pas présent, l'ajouter en catégorie **Resolved**. Vérifier ceux des Tasks : `New`, `Active`, `Blocked`, `On Hold`, `Closed`. Confirmer le comportement des changements d'état sur des work items de test avant l'automatisation.
 5. Disposer de **Story Points** et de **Business Value (1–10)** pour les US. **Aucun champ d'estimation horaire spécifique n'est nécessaire** pour les US ni les Tasks.

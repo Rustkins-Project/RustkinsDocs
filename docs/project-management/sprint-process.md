@@ -48,7 +48,7 @@ Rustkins est développé par **trois personnes sur leur temps libre**, sans pré
 
 **Le suivi quotidien est donc asynchrone :** chaque intervention significative est consignée dans `RustkinsActivity`, et les états/sprints sont mis à jour dans Azure Boards. Les autres membres de l'équipe peuvent ainsi connaître à tout moment : ce qui est en cours, terminé, bloqué, en pause, les US `Resolved`, les PR, les résultats de tests et les prochaines actions.
 
-Le bot Discord publie des **points d'activité** à partir des fiches RustkinsActivity, avec une synthèse IA locale facultative selon son contrat : **il ne lit pas Azure Boards**. Les rapports de suivi de sprint consolidant Azure Boards, GitHub et les dépendances seront produits à la demande par le futur skill `rustkins-sprint-status`. Aucun bilan ne doit inventer de faits ou supposer que les trois développeurs ont travaillé ce jour-là.
+Le bot Discord publie des **points d'activité** à partir des fiches RustkinsActivity, avec une synthèse IA locale facultative selon son contrat : **il ne lit pas Azure Boards**. Le skill disponible `rustkins-sprint-status` produit à la demande des rapports de suivi consolidant Azure Boards, GitHub et les dépendances. Aucun bilan ne doit inventer de faits ou supposer que les trois développeurs ont travaillé ce jour-là.
 
 Un échange synchrone reste utile **à la demande**, par exemple pour lever une dépendance, décider d'une architecture, résoudre un blocage ou préparer une livraison ; il ne prend pas la forme d'un Daily imposé.
 
