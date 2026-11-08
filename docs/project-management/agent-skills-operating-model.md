@@ -65,7 +65,7 @@ Une PR intermédiaire peut comporter plusieurs lignes `Closed AB#<task>`, **une 
 
 Les règles approuvées de [DoD](definition-of-done-and-tests.md) incluent **les AC, toutes les Tasks Closed, les tests unitaires, intégration, E2E et un déploiement sur la plateforme de test avec des preuves de la version testée**.
 
-- `Resolved AB#<US>` est permis sur la PR finale **seulement si les conditions sont effectivement réunies avant son merge**. Les dernières Tasks fermées par ce merge doivent être entièrement validées ; les états résultants seront contrôlés.
+- `Resolved AB#<US>` est permis sur la PR finale si les AC, tests, déploiement et preuves nécessaires sont **vérifiés avant son merge** et si ses dernières Tasks sont entièrement réalisées, prêtes à être clôturées par ce même merge. La DoD n'est réputée complète qu'**après vérification des états réellement persistés** : toutes les Tasks doivent alors être `Closed` et l'US `Resolved`. L'ordre d'application des transitions simultanées n'est pas garanti ; si Azure refuse cette combinaison, omettre `Resolved` et le faire ensuite via `az` après contrôle.
 - **Si une validation n'est possible qu'après merge**, mettre uniquement `AB#<US>` dans la dernière PR. Après preuve de déploiement/test, `rustkins-boards` peut passer l'US à `Resolved` via `az`, avec relecture et traces.
 - Une US n'est jamais `Closed` au merge : elle passe à `Closed` **après validation humaine lors de la Sprint Review**, décision consignée dans le compte rendu.
 - Les Tasks hors PR (analyse/documentation qui ne nécessite pas de publication) peuvent passer à `Closed` dès que leur livrable est réellement vérifié.
