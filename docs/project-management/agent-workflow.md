@@ -52,7 +52,19 @@ Pour `Blocked` et `On Hold`, les skills doivent modifier **`System.State`** vers
 
 Les skills peuvent calculer `eligible_for_resolved` et `eligible_for_closed` comme **recommandations**, jamais comme preuves à eux seuls. En particulier, `eligible_for_closed` ne déclenche pas la clôture hors Sprint Review, même si tous les tests sont verts.
 
-### 1.4. Journal des interventions (RustkinsActivity)
+### 1.4. Workflow de développement et transitions par PR
+
+Le [modèle opérationnel des skills](agent-skills-operating-model.md) formalise les décisions d'équipe : `gh`/`git` et `az` en priorité, appels API ciblés possibles (notamment Discord), **aucun usage opérationnel de RustkinsMCP**, pas de versionnement individuel des skills et encodage UTF-8 pour le français.
+
+Le backlog Epic/Feature/US est préparé avant développement. Au Sprint Planning, l'équipe valide les US ; les Tasks principales sont alors créées **sans responsable**. À la prise en charge, l'agent attribue une Task libre au développeur courant ; il ne réattribue pas le travail d'un tiers. Des Tasks techniques supplémentaires peuvent être créées pendant le sprint si leur périmètre reste celui de l'US.
+
+L'agent crée les branches, code, teste, committe, pousse et ouvre la PR sans confirmation supplémentaire, **mais ne review, n'approuve ni ne merge**. Une PR couvre une US par défaut ; plusieurs PR ou dépôts sont possibles pour une même US. Une Task/Bug autonome peut avoir sa PR dédiée.
+
+Pour chaque **Task réellement terminée par une PR**, inscrire `Closed AB#<id>` dans le **corps de la PR**. Les PR intermédiaires d'une US utilisent `AB#<us-id>` sans transition. Une seule PR finale peut porter `Resolved AB#<us-id>`, à condition que les autres PR soient mergées d'abord **et** que toute la DoD de l'US, y compris déploiement/test E2E sur plateforme de test, soit vérifiée. Sinon, garder une simple référence `AB#` et passer à `Resolved` ensuite via Azure après validation. `Closed` pour l'US reste réservé à la Sprint Review.
+
+L'application Azure Boards for GitHub exécute les transitions au merge vers la branche par défaut ; elle **ne vérifie pas elle-même la DoD**. Aucun workflow GitHub Actions personnalisé de clôture n'est prévu à ce stade. Après merge, relire les états réellement persistés.
+
+### 1.5. Journal des interventions (RustkinsActivity)
 
 Les agents suivent le [guide opérationnel transversal](activity-journal-integration.md) et les [règles canoniques](https://github.com/Rustkins-Project/RustkinsActivity/blob/main/docs/activity-workflow.md). Le skill partagé est publié dans [RustkinsSkills](https://github.com/Rustkins-Project/RustkinsSkills). Ils recherchent les brouillons et activités ouvertes avant de créer ; reprennent automatiquement une correspondance claire, mais ne modifient jamais `completed` ou `abandoned`. Le nouveau `repositories` contient un ou plusieurs dépôts, et une intervention rapide peut être enregistrée directement `completed`.
 
