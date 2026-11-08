@@ -16,7 +16,7 @@ applies_to: [all]
 
 ## 1. Objectif et principes directeurs
 
-Ce document définit la gestion Agile de Rustkins : hiérarchie des éléments de travail, préparation des sprints, colonnes Azure Boards, responsabilités, critères d'acceptation, **Definition of Ready (DoR)** et **Definition of Done (DoD)**. Il constitue une référence pour l'équipe et un socle métier pour les futurs skills Codex et Claude Code.
+Ce document définit la gestion Agile de Rustkins : hiérarchie des éléments de travail, préparation des sprints, colonnes Azure Boards, responsabilités, critères d'acceptation, **Definition of Ready (DoR)** et **Definition of Done (DoD)**. Il constitue une référence pour l'équipe et les skills Codex et Claude Code disponibles dans RustkinsSkills.
 
 1. **Azure Boards est la source officielle** des Epics, Features, US, Tasks, Bugs, Issues, priorités, itérations et états. `RustkinsActivity` conserve le journal des interventions, sans copier le backlog.
 2. **Epic = version / lot** ; **Feature = fonctionnalité principale regroupant les US** ; **US = capacité vérifiable** ; **Task = action technique ou organisationnelle suivie**.
