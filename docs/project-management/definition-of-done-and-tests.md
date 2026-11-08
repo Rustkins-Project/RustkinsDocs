@@ -130,9 +130,15 @@ Dans Azure Boards, conserver au minimum :
 
 **Association PR ↔ work item :** Rustkins utilise **l'application Azure Boards pour GitHub** afin de lier les Pull Requests GitHub aux éléments de travail Azure. Les PR référencent les identifiants Azure via la syntaxe **`AB#123`** dans leur description (ou une autre liaison explicite reconnue par l'application). Le lien doit être vérifiable depuis Azure Boards ; une simple mention textuelle non reconnue n'est pas une preuve suffisante.
 
-**Contrôle à venir :** une **CI GitHub** vérifiera qu'une PR porte au moins une référence Azure valide et liée aux work items concernés, avant son intégration. Une référence absente, erronée ou non accessible doit faire échouer le contrôle ; la vérification complète dépendra des permissions et de l'API Azure disponibles.
+**Liaison et transitions natives :** Rustkins utilise l'application Azure Boards pour GitHub. Dans le corps d'une PR, `AB#123` crée un lien **sans transition** ; `Closed AB#151` demande la clôture de la Task terminée par cette PR ; `Resolved AB#142` demande le passage de l'US à `Resolved` lorsque la PR est mergée dans la **branche par défaut**. Chaque Task terminée doit porter sa **propre** instruction `Closed AB#...` ; ne pas présumer qu'un verbe s'applique à plusieurs identifiants.
 
-**Attention :** utiliser une référence simple **`AB#123`**, sans formule de fermeture automatique telle que **`Fixes AB#123`**. Les automatismes GitHub/Azure ne doivent **jamais clôturer une US à la fusion de sa PR** : cette clôture intervient uniquement après validation à la Sprint Review.
+Une PR par US est privilégiée, avec plusieurs PR possibles dans un ou plusieurs dépôts. Les PR intermédiaires mentionnent simplement `AB#<US>` et closent les Tasks qu'elles réalisent. **Seule la PR finale** peut mentionner `Resolved AB#<US>` et doit être mergée **après toutes les autres**. Si la PR est finalement mergée plus tôt ou si le périmètre évolue, retirer ce mot-clé.
+
+**Interdiction de dégrader la DoD :** l'application Azure Boards ne vérifie ni les AC, ni les tests, ni le déploiement. `Resolved AB#<US>` n'est donc permis **que si tous les critères de cette page sont effectivement satisfaits avant merge**, notamment la version déployée en test et ses E2E ; si le déploiement/test n'est possible qu'après merge, utiliser `AB#<US>` sans transition, puis passer à `Resolved` via `az` après vérification. Les dernières Tasks peuvent être clôturées par le merge ; contrôler les états réellement persistés ensuite.
+
+**La fusion d'une PR ne clôt jamais automatiquement l'US en `Closed`** : cette transition requiert toujours la validation humaine pendant la Sprint Review et son compte rendu. Éviter `Fixes AB#...` et autres verbes involontaires susceptibles de déclencher des transitions différentes ; vérifier les états après merge. Référence : [Azure Boards — lien et transitions GitHub](https://learn.microsoft.com/en-us/azure/devops/boards/github/link-to-from-github?view=azure-devops).
+
+Les contrôles GitHub Actions supplémentaires sur références/états/DoD sont **facultatifs et futurs** ; le premier lot de skills repose sur la liaison et les transitions natives, avec review humaine et checks CI existants.
 
 Pour faciliter l'automatisation des vérifications, consigner ces références dans une section conventionnelle **`## Preuves de validation`** dans l'US ou dans un commentaire de validation structuré, plutôt que de multiplier immédiatement les champs Azure personnalisés.
 
