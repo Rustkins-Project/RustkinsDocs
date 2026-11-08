@@ -29,7 +29,7 @@ L'équipe clarifie les US, vérifie leur INVEST/DoR, identifie les dépendances,
 1. Définir en équipe le **Sprint Goal**, simple et vérifiable.
 2. Évaluer les disponibilités réelles des trois développeurs pour la période : Rustkins est un projet personnel ; les temps libres peuvent varier d'un sprint à l'autre.
 3. Sélectionner les US répondant à la DoR, selon priorité, dépendances et capacité ; utiliser les Story Points comme mesure relative, **sans estimation en heures des US ou des Tasks**.
-4. Décomposer les US retenues en Tasks techniques ou organisationnelles utiles, avec responsables et résultats attendus. Les tests sont compris dans ces Tasks et dans la DoD.
+4. Après validation de la sélection, décomposer les US retenues en Tasks techniques ou organisationnelles utiles, avec résultats attendus et dépendances. Les Tasks sont créées **sans responsable au Sprint Planning** : l'attribution intervient quand un développeur les prend en charge. Les tests sont compris dans ces Tasks et dans la DoD.
 5. Associer les work items au bon sprint via `Iteration Path` et relire les liens parents/dépendances.
 6. Signaler les risques et convenir des actions préventives.
 
@@ -37,7 +37,7 @@ L'équipe clarifie les US, vérifie leur INVEST/DoR, identifie les dépendances,
 
 - Le **Sprint Goal** reste stable ; des ajustements de Tasks peuvent être nécessaires.
 - **Timothy est responsable des modifications du Sprint Backlog en cours de sprint** : ajout/retrait d'US, changement de priorité, transfert d'un Bug ou ajustement de périmètre. Les agents proposent et justifient ; Timothy décide et en consigne la raison et l'impact.
-- Les Tasks supplémentaires sont créées uniquement si leur suivi apporte de la valeur, **jamais pour matérialiser automatiquement l'écriture des tests**.
+- Les Tasks supplémentaires sont créées **autonomement par l'agent** si leur suivi apporte de la valeur et si elles restent dans le périmètre de l'US ; **jamais pour matérialiser automatiquement l'écriture des tests**. Les nouvelles Tasks ne sont affectées qu'à leur prise en charge ; une Task déjà assignée n'est pas réattribuée silencieusement.
 - Un Bug peut être enregistré à tout moment ; sa prise en charge dans le sprint est arbitrée par Timothy, en concertation avec l'équipe lorsque l'objectif de sprint est menacé.
 - Chaque développeur et son agent actualisent Azure Boards et leurs fiches dans `RustkinsActivity` à mesure que le travail progresse ; les résultats CI et les PR fournissent les preuves techniques.
 - Les états et colonnes `Blocked` et `On Hold` rendent visibles respectivement les dépendances bloquantes et les mises en pause.
@@ -48,7 +48,7 @@ Rustkins est développé par **trois personnes sur leur temps libre**, sans pré
 
 **Le suivi quotidien est donc asynchrone :** chaque intervention significative est consignée dans `RustkinsActivity`, et les états/sprints sont mis à jour dans Azure Boards. Les autres membres de l'équipe peuvent ainsi connaître à tout moment : ce qui est en cours, terminé, bloqué, en pause, les US `Resolved`, les PR, les résultats de tests et les prochaines actions.
 
-Le bot Discord peut produire des **rapports réguliers déterministes** à partir d'Azure Boards et des journaux d'activité, enrichis au besoin par les PR, CI et déploiements GitHub. Une synthèse IA facultative peut faciliter la lecture, sans inventer de faits. La présence d'un rapport ne signifie pas que les trois développeurs ont travaillé ce jour-là.
+Le bot Discord publie des **points d'activité** à partir des fiches RustkinsActivity, avec une synthèse IA locale facultative selon son contrat : **il ne lit pas Azure Boards**. Les rapports de suivi de sprint consolidant Azure Boards, GitHub et les dépendances seront produits à la demande par le futur skill `rustkins-sprint-status`. Aucun bilan ne doit inventer de faits ou supposer que les trois développeurs ont travaillé ce jour-là.
 
 Un échange synchrone reste utile **à la demande**, par exemple pour lever une dépendance, décider d'une architecture, résoudre un blocage ou préparer une livraison ; il ne prend pas la forme d'un Daily imposé.
 
