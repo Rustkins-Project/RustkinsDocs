@@ -16,9 +16,9 @@ applies_to: [all]
 
 Dans Rustkins, **un statut est un état réel du work item**, enregistré dans le champ Azure DevOps `System.State` et **représenté aussi par une colonne du Board**. Les états `Blocked` et `On Hold` seront ajoutés aux types **User Story** et **Task** dans un **processus Agile hérité**. Ils sont tous deux associés à la catégorie système **In Progress**, ce qui signifie que l'élément reste en cours et n'est pas considéré comme livré.
 
-| Type | États prévus (et colonnes correspondantes) | Catégories des états personnalisés |
+| Type | États prévus (et colonnes correspondantes) | Catégories des états à distinguer |
 |---|---|---|
-| US | `New` → `Active` / `Blocked` / `On Hold` → `Resolved` → `Closed` | `Blocked`, `On Hold` : **In Progress** ; `Resolved` : **Resolved** |
+| US | `New` → `Active` / `Blocked` / `On Hold` → `Resolved` → `Closed` | `Blocked`, `On Hold` : **In Progress** ; `Resolved` Agile hérité : **In Progress** |
 | Task | `New` → `Active` / `Blocked` / `On Hold` → `Closed` | `Blocked`, `On Hold` : **In Progress** |
 | Bug | `New` → `Active` → `Resolved` → `Closed` | Conserver le workflow du Bug, sous réserve de sa configuration réelle |
 | Issue | États du processus Agile configuré | Pas de personnalisation définie pour le moment |
@@ -26,9 +26,11 @@ Dans Rustkins, **un statut est un état réel du work item**, enregistré dans l
 
 `Blocked` et `On Hold` ne sont **pas deux étapes successives** : ils constituent des états alternatifs à `Active`. Le passage à `Resolved` requiert la DoD complète ; le passage de l'US à `Closed` intervient uniquement pendant la Sprint Review.
 
-**Configuration requise :** créer `Blocked` et `On Hold` sur chacun des types US et Task, choisir la catégorie **In Progress**, puis configurer les colonnes du Board correspondant à ces états. Confirmer que l'état `Resolved` est disponible pour les US ; sinon, l'ajouter au processus hérité en catégorie **Resolved**. Ne pas confondre la **catégorie système** (`In Progress`, `Resolved`, `Completed`) avec le **nom de l'état** (`Active`, `Blocked`, `On Hold`, `Resolved`, `Closed`).
+**Configuration requise :** créer `Blocked` et `On Hold` sur chacun des types US et Task, choisir la catégorie **In Progress**, puis configurer les colonnes du Board correspondant à ces états. Confirmer que l'état Agile hérité `Resolved` est disponible pour les US. Sa catégorie système est **In Progress** et ne peut pas être modifiée dans un processus hérité ; les requêtes, les indicateurs et les skills doivent donc distinguer `Resolved` par `System.State` et ne compter comme livrées que les US `Closed`. Ne pas confondre la **catégorie système** avec le **nom de l'état** (`Active`, `Blocked`, `On Hold`, `Resolved`, `Closed`).
 
 **Particularité Azure DevOps :** le Board des US et le **Taskboard du sprint** ne partagent pas exactement la même configuration d'affichage. L'ajout d'états personnalisés aux Tasks peut créer des colonnes sur le Taskboard ; il faut vérifier leur ordre et leur correspondance. Les skills doivent d'abord lire et modifier **`System.State`**, puis contrôler la colonne réellement affichée et corriger sa configuration si nécessaire. Une modification de `System.BoardColumn` seule ne suffit pas à matérialiser un changement d'état.
+
+Le Board des Stories affiche aussi les Bugs, configurés comme exigences. Dans ses colonnes `Blocked` et `On Hold`, le mapping des **US** pointe vers les états homonymes ; celui des **Bugs** reste `Active`, car ces deux états n'existent pas pour le type Bug. Pour un Bug, la colonne ne prouve donc pas un état `Blocked` ou `On Hold` : consulter `System.State`.
 
 ### 1.2. Signification des états et colonnes
 
@@ -60,7 +62,7 @@ stateDiagram-v2
     New --> New: Report au sprint suivant si non commencée
 ```
 
-Ce diagramme représente **à la fois les transitions entre les états réels `System.State` et le déplacement de leurs cartes dans les colonnes correspondantes**. `Active`, `Blocked` et `On Hold` sont trois états distincts de la catégorie système **In Progress**.
+Ce diagramme représente **à la fois les transitions entre les états réels `System.State` et le déplacement de leurs cartes dans les colonnes correspondantes**. `Active`, `Blocked`, `On Hold` et l'état Agile hérité `Resolved` sont quatre états distincts de la catégorie système **In Progress**. La règle métier continue de réserver `Resolved` aux US prêtes pour la review.
 
 Une interruption de travail, un arrêt de l'agent ou la fin d'une conversation ne justifie pas à lui seul `Closed`, `Resolved` ni la suppression de l'US.
 
