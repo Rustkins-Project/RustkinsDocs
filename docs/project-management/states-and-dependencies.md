@@ -30,6 +30,8 @@ Dans Rustkins, **un statut est un état réel du work item**, enregistré dans l
 
 **Particularité Azure DevOps :** le Board des US et le **Taskboard du sprint** ne partagent pas exactement la même configuration d'affichage. L'ajout d'états personnalisés aux Tasks peut créer des colonnes sur le Taskboard ; il faut vérifier leur ordre et leur correspondance. Les skills doivent d'abord lire et modifier **`System.State`**, puis contrôler la colonne réellement affichée et corriger sa configuration si nécessaire. Une modification de `System.BoardColumn` seule ne suffit pas à matérialiser un changement d'état.
 
+Le Board des Stories affiche aussi les Bugs, configurés comme exigences. Dans ses colonnes `Blocked` et `On Hold`, le mapping des **US** pointe vers les états homonymes ; celui des **Bugs** reste `Active`, car ces deux états n'existent pas pour le type Bug. Pour un Bug, la colonne ne prouve donc pas un état `Blocked` ou `On Hold` : consulter `System.State`.
+
 ### 1.2. Signification des états et colonnes
 
 | État / colonne | Signification et sortie |
