@@ -4,6 +4,8 @@ Ce répertoire rassemble la documentation relative à l'entreprise et aux enjeux
 
 | Domaine | Contenu |
 | --- | --- |
+| [Dossier entrepreneurial](entrepreneurial-report/README.md) | Parcours de lecture du livrable global et état de rédaction des cinq axes demandés |
+| [Présentation et structure de l'entreprise](company/README.md) | Vision produit, cibles, organisation de l'équipe et structure future envisagée |
 | [RGPD et protection des données](gdpr/README.md) | Gouvernance des données, analyses, livrables RGPD, comptes rendus |
 | [Modèle économique](business-model/README.md) | Offre gratuite, financement, services premium, stratégie commerciale |
 | [Direction artistique](art-direction/README.md) | Identité visuelle, marque, charte, supports graphiques |
