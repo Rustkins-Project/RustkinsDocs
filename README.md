@@ -1,6 +1,6 @@
 # RustkinsDocs
 
-La documentation du produit est regroupée dans `docs/` (architecture, conventions, opérations, gestion de projet, spécifications et versions). L'index, les décisions, les connaissances, les recherches, les modèles et les schémas restent à la racine du dépôt.
+La documentation du produit est regroupée dans `docs/` (architecture, conventions, opérations, gestion de projet, spécifications, versions et domaines transversaux). L'index, les décisions, les connaissances, les recherches, les modèles et les schémas restent à la racine du dépôt.
 
 Référentiel documentaire et mémoire collective de **Rustkins** : spécifications, architecture, décisions, connaissances réutilisables, procédures et conventions. Les documents Markdown restent la source de vérité : l'index facilite leur découverte mais ne remplace pas leur contenu.
 
@@ -18,6 +18,7 @@ Référentiel documentaire et mémoire collective de **Rustkins** : spécificati
 | Procédure reproductible | [operations/](docs/operations/README.md) | Déploiement, maintenance, incident |
 | Gestion Agile, sprints, DoD | [project-management/](docs/project-management/README.md) | Processus Azure Boards et suivi de projet |
 | Règle d'équipe ou de contribution | [conventions/](docs/conventions/knowledge-management.md) | Git, qualité, mémoire collective |
+| Enjeux transversaux (RGPD, économie, design, veille, éco-conception, communication) | [cross-cutting/](docs/cross-cutting/README.md) | Registre RGPD, modèle économique, documents de communication |
 | Étude exploratoire sans décision | [research/](research/README.md) | Comparaison, POC |
 
 **Autres sources de vérité :**

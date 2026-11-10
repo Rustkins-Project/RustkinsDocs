@@ -31,7 +31,8 @@
         "convention",
         "operation",
         "project-management",
-        "version"
+        "version",
+        "cross-cutting"
       ]
     },
     "status": {
