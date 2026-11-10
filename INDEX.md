@@ -1,6 +1,6 @@
 # Index documentaire Rustkins
 
-Cet index reste à la racine du dépôt. Les six domaines documentaires sont regroupés sous `docs/` ; les décisions, connaissances, recherches, modèles et schémas restent dans leurs dossiers racine.
+Cet index reste à la racine du dépôt. Les sept domaines documentaires sont regroupés sous `docs/` ; les décisions, connaissances, recherches, modèles et schémas restent dans leurs dossiers racine.
 
 Cet index permet de localiser la **documentation officielle**, les **décisions** et les **connaissances**. La source de vérité reste chaque fichier Markdown, en tenant compte de son statut et de sa version de produit.
 
@@ -36,6 +36,17 @@ Attention : **version de spécification YAML ≠ version du produit**.
 - [Scheduler](docs/architecture/components/scheduler/11-scheduler-architecture.md)
 - [MCD V0 (Mermaid)](docs/architecture/data-model/MCD_Rustkins_V0.mmd) · [Image](docs/architecture/data-model/MCD_Rustkins_V0.png)
 - [MCD V1 (Mermaid)](docs/architecture/data-model/MCD_Rustkins_V1.mmd) · [Image](docs/architecture/data-model/MCD_Rustkins_V1.png)
+
+## Domaines transversaux (entreprise et projet)
+
+- [Index des domaines transversaux](docs/cross-cutting/README.md)
+- [RGPD et protection des données](docs/cross-cutting/gdpr/README.md)
+- [Compte rendu RGPD — 9 novembre 2026](docs/cross-cutting/gdpr/meeting-notes/2026-11-09-rgpd-meeting.md)
+- [Modèle économique de Rustkins](docs/cross-cutting/business-model/business-model.md)
+- [Direction artistique](docs/cross-cutting/art-direction/README.md)
+- [Veille](docs/cross-cutting/technology-watch/README.md)
+- [Éco-conception](docs/cross-cutting/eco-design/README.md)
+- [Communication](docs/cross-cutting/communication/README.md)
 
 ## Base de connaissances et règles
 

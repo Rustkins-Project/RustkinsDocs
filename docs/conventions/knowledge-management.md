@@ -34,6 +34,7 @@ Les domaines documentaires sont regroupés dans `docs/`. L'index `INDEX.md`, les
 - `knowledge/` : observations vérifiables, solutions et pratiques réutilisables.
 - `docs/operations/` : procédures exécutables par étapes (runbooks).
 - `docs/conventions/` : conventions de contribution et règles d'équipe.
+- `docs/cross-cutting/` : sujets d'entreprise et de projet (RGPD, business model, direction artistique, veille, éco-conception, communication). Les analyses transversales se réfèrent aux sources techniques sans les recopier ; les pistes ne valent pas décisions de mise en œuvre.
 - `docs/project-management/` : gouvernance Agile, DoD, gestion des sprints et Azure Boards.
   Point d'entrée : [index de gestion de projet](../project-management/README.md) ; les règles sont réparties par thème dans ce dossier.
 - `research/` : études exploratoires et POC sans caractère officiel.
