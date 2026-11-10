@@ -23,27 +23,42 @@ Une entrée de veille n'est pas une décision : un changement de dépendance str
 
 ## 2. Processus de veille
 
-### 2.1 Sources suivies
+### 2.1 Principe : les lockfiles définissent le périmètre
 
-| Type | Source | Outils couverts |
-| --- | --- | --- |
-| Releases | *Watch → Custom → Releases* sur GitHub (tokio-rs/tokio, tokio-rs/axum, amqp-rs/lapin, launchbadge/sqlx, rustfs/rustfs, fussybeaver/bollard, vercel/next.js, traefik/traefik, rabbitmq/rabbitmq-server) | Toutes les briques |
-| Blogs officiels | blog.rust-lang.org, tokio.rs/blog, nextjs.org/blog, rabbitmq.com/blog, postgresql.org/about/news, rustfs.com/blog | Annonces majeures et feuilles de route |
-| Agrégateurs | *This Week in Rust* (hebdomadaire), r/rust, Hacker News | Tendances écosystème Rust |
-| Sécurité | RustSec Advisory DB (`cargo audit`), GitHub Security Advisories, alertes Dependabot, `pnpm audit`, CVE Traefik/RabbitMQ/PostgreSQL | Failles des dépendances |
-| Réglementation | ENISA, Commission européenne (Cyber Resilience Act), OpenSSF | Obligations open source |
-| Concurrence | Voir [veille concurrentielle](competitive-landscape.md) | Marché CI/CD |
+La liste des technologies suivies n'est pas tenue à la main : elle découle de `Cargo.toml` / `Cargo.lock`, `package.json` / `pnpm-lock.yaml` et des images de `compose.yaml`. Une technologie qui n'y figure pas n'est pas suivie (sauf veille concurrentielle et réglementaire).
 
-### 2.2 Automatisation proposée
+### 2.2 Sources, par niveau
 
-*Proposition, à valider en équipe :*
+| Niveau | Source | Ce qu'elle couvre | Filtrage |
+| --- | --- | --- | --- |
+| **1 — Automatique** | **Renovate** ou **Dependabot** sur les dépôts de code | Nouvelles versions des crates, paquets npm et images Docker (RabbitMQ, PostgreSQL, RustFS, Traefik), changelog inclus dans la PR | Natif : seules nos dépendances |
+| | **`cargo audit`** (RustSec) et **`pnpm audit`** en CI | Failles connues, dépendances transitives comprises | Natif : notre arbre de dépendances |
+| | **`cargo deny`** en CI | Licences, sources et doublons de crates | Natif |
+| | **`cargo outdated`** une fois par sprint | Écarts de version restants | Natif |
+| **2 — Annonces des dépendances directes** | Flux Atom des releases GitHub (`https://github.com/<owner>/<repo>/releases.atom`) : tokio-rs/tokio, tokio-rs/axum, amqp-rs/lapin, launchbadge/sqlx, rustfs/rustfs, fussybeaver/bollard, vercel/next.js, traefik/traefik, rabbitmq/rabbitmq-server | Versions majeures, feuilles de route | Un flux par dépendance **directe** uniquement |
+| | Blogs officiels : blog.rust-lang.org, tokio.rs/blog, nextjs.org/blog, rabbitmq.com/blog, postgresql.org/about/news, rustfs.com/blog | Annonces majeures | — |
+| **3 — Écosystème** | *This Week in Rust* (hebdomadaire) : rubriques « Crate of the week » et « Updates from Rust Community » | Tendances Rust, nouvelles crates | Lecture ciblée par mots-clés |
+| | Hacker News via hnrss.org (ex. `https://hnrss.org/newest?q=tokio+OR+axum+OR+rabbitmq`) | Débats, retours d'expérience | Mots-clés (§2.3) |
+| | F5Bot : alerte mail sur Reddit et Hacker News | Mentions de « rustkins », des concurrents et des outils | Mots-clés (§2.3) |
+| | r/rust, users.rust-lang.org | Questions et pièges | Lecture occasionnelle |
+| **4 — Concurrence et réglementation** | Releases de Woodpecker, Forgejo, GitLab Runner, Jenkins ; ENISA, Commission européenne, OpenSSF (Cyber Resilience Act) | Voir [veille concurrentielle](competitive-landscape.md) | — |
 
-- **Dependabot ou Renovate** sur les dépôts de code : PR automatique à chaque nouvelle version (Cargo, npm, images Docker), regroupées par semaine pour les versions mineures.
-- **`cargo audit`** et **`cargo deny`** (licences, sources, doublons) dans la CI : échec du build sur une faille connue. Cela permet aussi de vérifier que les licences restent compatibles avec la licence open source de Rustkins.
-- **`pnpm audit`** côté front.
-- Un flux RSS commun (GitHub releases au format Atom : `https://github.com/<owner>/<repo>/releases.atom`) relayé sur un salon Discord `#veille` par le RustkinsDiscordBot.
+Tous les flux (niveaux 2 à 4) sont regroupés dans un même lecteur RSS (FreshRSS auto-hébergé, Inoreader ou Feedly).
 
-### 2.3 Rituel
+### 2.3 Règles de filtrage
+
+1. **Dépendances directes** (`Cargo.toml`, `package.json`, `compose.yaml`) : flux de releases (niveau 2) et alertes sécurité.
+2. **Dépendances transitives** : sécurité uniquement, via `cargo audit` / `pnpm audit` ; pas de suivi de leurs nouveautés.
+3. **Un mot-clé par outil**, identique dans le lecteur RSS, hnrss et F5Bot : `tokio`, `axum`, `lapin`, `sqlx`, `rustfs`, `bollard`, `rabbitmq`, `postgresql`, `next.js`, `traefik`, plus `rustkins` et les noms des concurrents.
+4. **Trier par urgence** avec la grille du §2.6 : faille → action immédiate ; version majeure ou changement de licence → work item ; le reste → lu puis ignoré s'il ne concerne pas Rustkins.
+5. **Ne consigner au journal (§4) que ce qui a un effet sur Rustkins.**
+6. **Mettre à jour la liste de mots-clés et de flux** dès qu'une dépendance directe est ajoutée ou retirée.
+
+### 2.4 Diffusion
+
+*Proposition, à valider en équipe :* un salon Discord `#veille` comme boîte de réception unique. Le RustkinsDiscordBot lirait les flux RSS et ne publierait que les entrées contenant un mot-clé du §2.3. Les PR Renovate/Dependabot et les échecs `cargo audit` restent signalés dans les dépôts de code.
+
+### 2.5 Rituel
 
 | Fréquence | Action | Responsable |
 | --- | --- | --- |
@@ -52,7 +67,7 @@ Une entrée de veille n'est pas une décision : un changement de dépendance str
 | Fin de sprint | 10 min en rétrospective : qu'est-ce qui affecte Rustkins ? créer les work items | Équipe |
 | Trimestriel | Mettre à jour le tableau §3 et la veille concurrentielle | Tournant |
 
-### 2.4 Grille d'évaluation d'une évolution
+### 2.6 Grille d'évaluation d'une évolution
 
 | Question | Si oui |
 | --- | --- |
