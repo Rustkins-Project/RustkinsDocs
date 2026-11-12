@@ -40,7 +40,7 @@ Les indications ci-dessous sont **la grille de préparation retenue par l'équip
 | --- | --- | --- |
 | **r/alphaandbetausers** | Aucun prérequis identifié | Publication directe pour éprouver le pitch et le processus d'installation, puis demander des bêta-tests |
 | **r/SideProject** | Aucun prérequis identifié | Publication directe sous la forme d'une présentation et d'une demande de retours |
-| **r/devops** | Déclarer le lien en tête ; rédaction personnelle, sans formulation artificielle assimilable à un texte LLM | **Uniquement dans le fil hebdomadaire d'autopromotion** |
+| **r/devops** | **Uniquement dans le fil hebdomadaire d'autopromotion** | Présentation du projet et demande de retours dans ce fil, avec un lien clair vers le dépôt GitHub |
 | **r/developpeurs** | Participation préalable ; lien vers le dépôt ; message en français et rédigé personnellement | Présentation du projet et demande de retours |
 | **r/selfhosted** | En anglais ; documentation ; si le premier commit public date de moins de 3 mois, utiliser le megathread | Megathread dans ce cas ; sinon publication principale seulement avec une V0.x réellement « production ready » selon les critères du subreddit |
 | **r/FOSS** | Licence libre requise | Publication directe **après les premiers retours**, en tenant compte de la modération commune évoquée avec r/opensource |
