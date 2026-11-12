@@ -3,7 +3,7 @@ id: DOC-0904
 title: "Communication Rustkins — Vidéo promotionnelle"
 type: cross-cutting
 status: draft
-summary: "Format et script scène par scène d'une vidéo promotionnelle Rustkins de moins de deux minutes, centrée sur souveraineté et fonctionnalités natives."
+summary: "Format et script scène par scène d'une vidéo promotionnelle Rustkins de moins de deux minutes, centrée sur la souveraineté, la sécurité et la richesse fonctionnelle native."
 topics: [communication, video, script, promotion, launch]
 applies_to: [all]
 ---
@@ -23,7 +23,7 @@ applies_to: [all]
 | **Audience** | Développeurs, ingénieurs DevOps, administrateurs systèmes et publics techniques curieux |
 | **Objectif** | Donner envie de découvrir le projet et d'en suivre le développement |
 
-**Angle principal :** souveraineté et maîtrise de l'infrastructure grâce à l'auto-hébergement ; simplicité et fonctions essentielles natives, afin de limiter le recours aux plugins.
+**Angle principal :** souveraineté et maîtrise de l'infrastructure grâce à l'auto-hébergement ; plateforme complète et sécurisée, dotée de fonctionnalités natives pour limiter le recours aux plugins.
 
 L'indépendance par rapport à une forge Git est un argument secondaire, non le fil conducteur de la vidéo.
 
@@ -39,19 +39,19 @@ L'indépendance par rapport à une forge Git est un argument secondaire, non le 
 >
 > Mais entre les plateformes hébergées, les infrastructures complexes et les outils qui nécessitent une multitude de plugins, garder le contrôle de sa CI/CD peut vite devenir un défi.
 
-**Texte à l'écran :** « CI/CD : qui garde le contrôle ? »
+**Texte à l'écran :** « CI/CD : où est hébergée la plateforme ? »
 
 ### Scène 2 — Présentation de Rustkins (0:15–0:32)
 
-**Visuel :** apparition du logo Rustkins ; mentions « Open source », « Self-hosted », « Lightweight ».
+**Visuel :** apparition du logo Rustkins ; mentions « Open source », « Self-hosted », « Complete » et « Secure ».
 
 **Voix off :**
 
 > C'est pour répondre à ces problématiques que nous développons Rustkins.
 >
-> Une solution CI/CD open source, légère et auto-hébergeable, conçue pour offrir une alternative simple et flexible.
+> Une plateforme CI/CD open source, complète, sécurisée et auto-hébergeable, conçue pour réunir les fonctionnalités dont les équipes ont besoin.
 
-**Texte à l'écran :** « Rustkins — Open source · Auto-hébergeable · Pensé pour rester léger »
+**Texte à l'écran :** « Rustkins — Open source · Auto-hébergeable · Complète et sécurisée »
 
 ### Scène 3 — Souveraineté et maîtrise (0:32–0:50)
 
@@ -87,9 +87,9 @@ L'indépendance par rapport à une forge Git est un argument secondaire, non le 
 
 > Et parce que Rustkins est pensé comme un projet open source, chacun pourra consulter son code, proposer des améliorations et contribuer à son évolution.
 >
-> Nous souhaitons construire cet outil avec sa communauté, pour répondre à des besoins réels.
+> Nous souhaitons construire cet outil avec la communauté open source, pour répondre à des besoins réels.
 
-**Texte à l'écran :** « Un projet ouvert à la communauté »
+**Texte à l'écran :** « Un projet ouvert à la communauté open source »
 
 ### Scène 6 — Conclusion et appel à l'action (1:32–1:44)
 
@@ -115,7 +115,7 @@ L'indépendance par rapport à une forge Git est un argument secondaire, non le 
 
 ## 4. Message à retenir
 
-> **Souveraineté de l'hébergement + simplicité du moteur + fonctionnalités essentielles natives + développement ouvert à la communauté.**
+> **Souveraineté de l'hébergement + plateforme complète et sécurisée + fonctionnalités natives + développement avec la communauté open source.**
 
 La vidéo présente **une ambition produit**. Elle ne doit pas être interprétée comme la démonstration que toutes les fonctionnalités montrées sont déjà livrées.
 
