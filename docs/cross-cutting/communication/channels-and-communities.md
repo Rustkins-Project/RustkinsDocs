@@ -28,7 +28,7 @@ Les salons sont une action à part entière du plan, même s'ils interviennent a
 - **Explicatif :** quel problème Rustkins résout, à quoi sert la CI/CD, pourquoi choisir l'auto-hébergement.
 - **Technique :** configuration YAML, DAG, jobs Docker, logs, ressources et nouvelles fonctionnalités effectivement disponibles.
 - **Grand public :** bénéfice concret de la souveraineté et du contrôle de l'infrastructure.
-- **Témoignages et retours :** expériences de premiers utilisateurs, uniquement avec leur accord.
+- **Témoignages et retours d'expérience de l'équipe :** raconter les difficultés que nous avons personnellement rencontrées avec des solutions CI/CD comme Jenkins et GitHub Actions, les frustrations qui ont motivé la création de Rustkins et les réponses que nous cherchons à apporter. S'appuyer sur des situations concrètes sans généraliser ces difficultés à tous les utilisateurs.
 
 **Principes de diffusion :** vidéos verticales sous-titrées, versions françaises et anglaises selon les moyens, appels à l'action vers le site et le dépôt GitHub, rythme régulier mais tenable.
 
