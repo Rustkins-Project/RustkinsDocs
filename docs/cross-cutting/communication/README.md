@@ -13,7 +13,7 @@ Référentiel de la **stratégie de communication et du lancement de Rustkins**.
 | [Plan de lancement](launch-plan.md) | Les **4 actions** de communication, responsables, temporalité, prérequis, objectifs et indicateurs |
 | [Vidéo promotionnelle](promotional-video-script.md) | Format vertical, durée maximale de **2 minutes**, script et storyboard scène par scène |
 
-## Parcours de lecture pour le rendu de communication
+## Repères de lecture
 
 Les documents couvrent les livrables demandés dans l'exercice :
 
@@ -23,7 +23,7 @@ Les documents couvrent les livrables demandés dans l'exercice :
 4. **Quatre premières actions et leur temporalité** → [Plan de lancement, §2](launch-plan.md#2-tableau-des-quatre-actions).
 5. **Vidéo promotionnelle : format et script uniquement** → [Vidéo promotionnelle](promotional-video-script.md).
 
-Le **PDF de rendu** sera produit ultérieurement **à partir de ces Markdown**, après validation de leur contenu. Il pourra regrouper les cinq livrables dans un document unique et adopter une mise en page adaptée au rendu pédagogique ; **aucun PDF n'est généré dans cette première étape**.
+Un **PDF de synthèse** peut être généré à partir de ces documents Markdown. Les documents du dépôt restent la référence pour le contenu et ses mises à jour.
 
 ## Références et garde-fous
 
