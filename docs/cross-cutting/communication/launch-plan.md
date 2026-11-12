@@ -20,7 +20,7 @@ Planifier les **quatre premières actions de communication** de Rustkins, dans l
 
 | Ordre | Action | Média / support | Mise en œuvre et objectif | Responsables | Temporalité prévisionnelle |
 | --- | --- | --- | --- | --- | --- |
-| **1** | **Publication de vidéos courtes** | **YouTube Shorts, Instagram Reels, TikTok** | Publier des vidéos explicatives, techniques, grand public et, à terme, des témoignages. Présenter le projet et ses bénéfices, renvoyer vers la documentation et le dépôt GitHub. Décliner en français et en anglais. | **Timothy, Alexis** | **À partir de janvier 2027**, puis publications régulières |
+| **1** | **Publication de vidéos courtes** | **YouTube Shorts, Instagram Reels, TikTok** | Publier des vidéos explicatives, techniques, grand public et des témoignages de l'équipe sur les problèmes rencontrés avec Jenkins ou GitHub Actions. Présenter le projet et ses bénéfices, renvoyer vers la documentation et le dépôt GitHub. Décliner en français et en anglais. | **Timothy, Alexis** | **À partir de janvier 2027**, puis publications régulières |
 | **2** | **Appel aux bêta-testeurs** | **Reddit** | Publier des présentations adaptées aux communautés retenues ; demander des tests d'installation et de fonctionnement, conseils et signalements via GitHub Issues. Construire une relation durable avec les premiers utilisateurs. | **Alexis** | **Dès la disponibilité d'une version bêta exploitable et documentée**, selon les conditions de chaque subreddit |
 | **3** | **Création du site vitrine** | **Site internet Rustkins** | Présenter fonctionnalités, points forts, statut d'avancement, documentation, GitHub et modèle économique envisagé, sans annoncer d'offres non définies. Site français et anglais. | **Loick, Timothy** | **Décembre 2026 – janvier 2027** |
 | **4** | **Participation à des salons open source** | **RPLL, Open Source Experience** | Présenter Rustkins aux professionnels et communautés du logiciel libre, montrer une démonstration adaptée à la maturité du projet, recueillir des contacts et retours. | **Timothy, Alexis, Loick** | **RPLL : avril 2027** (8 avril envisagé, à confirmer) ; **Open Source Experience : fin 2027** (édition et dates à confirmer) |
@@ -49,7 +49,7 @@ Planifier les **quatre premières actions de communication** de Rustkins, dans l
 
 ### Action 3 — Site vitrine
 
-- Produire une page d'accueil exposant en priorité **souveraineté / auto-hébergement** et **simplicité / fonctionnalités natives**.
+- Produire une page d'accueil exposant en priorité **souveraineté / auto-hébergement** et **plateforme complète, sécurisée et fonctionnalités natives**.
 - Expliquer ce qui fonctionne, ce qui est en développement et ce qui est prévu.
 - Donner accès au dépôt de code, à la documentation, aux modalités de contribution et au futur parcours de bêta-test.
 - Présenter le **modèle économique envisagé** (logiciel gratuit/open source, services complémentaires possibles) sans tarifs ou conditions contractuelles inventés.
