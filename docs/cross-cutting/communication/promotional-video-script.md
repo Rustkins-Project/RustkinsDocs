@@ -47,9 +47,7 @@ L'indépendance par rapport à une forge Git est un argument secondaire, non le 
 
 **Voix off :**
 
-> C'est pour répondre à ces problématiques que nous développons Rustkins.
->
-> Une plateforme CI/CD open source, complète, sécurisée et auto-hébergeable, conçue pour réunir les fonctionnalités dont les équipes ont besoin.
+> C'est pourquoi nous développons Rustkins : une plateforme CI/CD open source, complète, sécurisée et auto-hébergeable, qui réunit les fonctionnalités clés dans un seul outil.
 
 **Texte à l'écran :** « Rustkins — Open source · Auto-hébergeable · Complète et sécurisée »
 
