@@ -42,6 +42,7 @@ Attention : **version de spécification YAML ≠ version du produit**.
 - [Index des domaines transversaux](docs/cross-cutting/README.md)
 - [RGPD et protection des données](docs/cross-cutting/gdpr/README.md)
 - [Compte rendu RGPD — 9 novembre 2026](docs/cross-cutting/gdpr/meeting-notes/2026-11-09-rgpd-meeting.md)
+- [Compréhension des attentes RGPD — Rustkins](docs/cross-cutting/gdpr/comprehension-attentes-rgpd.md)
 - [Modèle économique de Rustkins](docs/cross-cutting/business-model/business-model.md)
 - [Direction artistique](docs/cross-cutting/art-direction/README.md)
 - [Veille](docs/cross-cutting/technology-watch/README.md)
