@@ -6,6 +6,7 @@ status: draft
 summary: "Démarche d'éco-conception de Rustkins : périmètre de responsabilité, sobriété des ressources demandées, provisionnement des workers, métriques nécessaires, compromis assumés et lacunes de la documentation actuelle."
 topics: [eco-design, sobriety, scheduler, worker, provisioning, metrics]
 applies_to: [all]
+related_adrs: [ADR-0001]
 related_docs:
   - docs/architecture/components/scheduler/06-resource-scheduling.md
   - docs/architecture/components/worker/09-worker-architecture.md
@@ -121,7 +122,7 @@ Le cache déclaratif de YAML v3 ([§23](../../specifications/pipeline/yaml-v3.md
 ### 3.7 Stockage : des options, des valeurs par défaut raisonnables
 
 - **Artefacts** : rétention de 30 jours par défaut, plafond par projet et nettoyage automatique déjà spécifiés ([ARCH-04 §9](../../architecture/components/storage/04-artifacts.md#9-retention)).
-- **Logs** : aucune rétention n'est spécifiée ; elle figure seulement en évolution future ([ARCH-03 §15](../../architecture/components/logging/03-real-time-logs.md#15-future-evolution)). Il faut au minimum l'option de configuration, avec une valeur par défaut documentée. Le choix de la durée reste à l'administrateur.
+- **Logs** : rétention de 60 jours par défaut, avec suppression quotidienne des objets RustFS expirés et conservation des métadonnées ([V0 §18](../../versions/v0/overview.md#18-rétention-des-logs), [V1 §18.1](../../versions/v1/overview.md#181-logs)). Reste à la rendre configurable par l'administrateur ; l'évolution est prévue dans [ARCH-03 §15](../../architecture/components/logging/03-real-time-logs.md#15-future-evolution).
 - **Compression** des logs archivés (piste) : les logs texte se compressent très bien.
 
 ### 3.8 Recommandations sur les pipelines
@@ -164,11 +165,10 @@ L'équipe a identifié que RabbitMQ est probablement **surdimensionné** pour le
 Constats dans la documentation :
 
 - PostgreSQL est déjà la source de vérité et alimente RabbitMQ par une outbox transactionnelle ([ARCH-02](../../architecture/components/messaging/02-rabbitmq-architecture.md)). Une file de jobs dans PostgreSQL (`SELECT … FOR UPDATE SKIP LOCKED`) et des notifications `LISTEN/NOTIFY` couvriraient une partie des usages. Le transport des logs en temps réel vers plusieurs lecteurs est le cas où un broker apporte le plus.
-- **Contradiction à arbitrer :** l'architecture actuelle fait accéder les workers **directement à PostgreSQL**. Le scheduler **décide** (placement, réservation, retries, déblocage des jobs dépendants), mais c'est le worker qui **écrit** les états d'exécution du JobRun (`running`, `success`, `warning`, `failed`, `cancelled`). Le scheduler réagit ensuite à ces écritures ([ARCH-11 §8 et §9](../../architecture/components/scheduler/11-scheduler-architecture.md#9-completion-handling), [ARCH-09 §5 et §11](../../architecture/components/worker/09-worker-architecture.md#11-status-updates)). Le worker relit aussi le JobRun en base à la réception du message, celui-ci ne contenant que des identifiants. L'isolation recherchée n'est donc pas obtenue aujourd'hui : un worker compromis par un job malveillant détiendrait des identifiants de base de données.
-- Pour que le scheduler soit le seul à écrire les états, il faudrait : un message de job qui contient tout ce dont le worker a besoin (ou une API interne en lecture seule), et des comptes rendus d'état envoyés par le worker via RabbitMQ (file d'états consommée par le scheduler, idempotente). Le scheduler valide la transition puis l'écrit en base.
+- **Isolation des workers :** la documentation faisait auparavant accéder les workers directement à PostgreSQL. Ils relisaient le JobRun et écrivaient eux-mêmes les états d'exécution. Ce point est corrigé par l'[ADR-0001](../../../decisions/ADR-0001-worker-scheduler-communication.md) (proposée) : les workers n'ont plus d'accès à la base, reçoivent des ordres d'exécution autonomes dans leur propre file, et remontent leurs événements au Scheduler, seul à écrire l'état. L'isolation repose donc sur RabbitMQ, comme voulu.
 - L'isolation ne dépend pas du broker : elle s'obtient dès que les workers **ne détiennent aucun identifiant PostgreSQL** et passent par un intermédiaire qui valide leurs messages (RabbitMQ consommé par le scheduler, ou une API interne dédiée aux workers).
 
-**Orientation :** conserver RabbitMQ pour sortir la V1, l'architecture étant déjà conçue autour. Isoler l'accès au broker derrière une interface (trait Rust) pour qu'un remplacement ultérieur reste localisé. Mesurer l'empreinte du broker sur l'installation de référence. Corriger l'accès direct des workers à PostgreSQL, ou le justifier, dans une ADR. Toute décision de remplacement du broker passe aussi par une ADR.
+**Orientation :** conserver RabbitMQ pour sortir la V1, l'architecture étant déjà conçue autour. Isoler l'accès au broker derrière une interface (trait Rust) pour qu'un remplacement ultérieur reste localisé. Mesurer l'empreinte du broker sur l'installation de référence. Un éventuel remplacement du broker devra conserver cette isolation (les workers ne parlent qu'au Scheduler). Toute décision de remplacement du broker passe aussi par une ADR.
 
 ### 5.2 Autres compromis
 
@@ -192,8 +192,8 @@ Constats dans la documentation :
 | --- | --- | --- |
 | Collecte et exposition des métriques de consommation par job et par worker | Nouvelle spécification, ARCH-06, ARCH-09 | Haute : prérequis des autres leviers |
 | Comparaison ressources réservées / consommées et suggestion de dimensionnement | ARCH-06 | Haute |
-| Accès direct des workers à PostgreSQL, contraire à l'isolation recherchée (§5.1) | ARCH-01, ARCH-02, ARCH-06, ARCH-09, ADR | Haute : sécurité |
-| Rétention des logs (option et valeur par défaut) | ARCH-03 | Moyenne |
+| Validation et fusion de l'[ADR-0001](../../../decisions/ADR-0001-worker-scheduler-communication.md) (workers sans accès à PostgreSQL) | `decisions/` | Haute : sécurité |
+| Rétention des logs configurable (60 jours par défaut, déjà défini) | ARCH-03 | Basse |
 | Expiration (7 jours proposés) et quota du cache | YAML v3 §23 | Moyenne |
 | État `draining` des workers et profils de capacité horaires | ARCH-06, ARCH-09 | Moyenne |
 | Déclencheur planifié `schedule` (cron) | Spécification YAML future | Moyenne |
