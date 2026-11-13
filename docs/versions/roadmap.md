@@ -234,6 +234,11 @@ Transformer Rustkins en véritable plateforme CI/CD orientée production.
 * Cache déclaratif
 * Réutilisation entre runs
 * Invalidation du cache
+* Cache des couches Docker pour les builds d'images
+
+### Actions officielles
+
+* Actions réutilisables maintenues par l'équipe pour les outils de base (uv, ruff, cargo, clippy, etc.)
 
 ### Pipeline avancé
 

@@ -93,7 +93,7 @@ Aucun projet Rust ne propose aujourd'hui une **plateforme CI/CD complète auto-h
 
 ## 4. Grille comparative
 
-**Colonne Rustkins** : version de la [roadmap](../../versions/roadmap.md) où la fonctionnalité arrive (V0 → V3). « — » = non prévu à ce jour ; « à fixer » = voulu mais sans version.
+**Colonne Rustkins** : version de la [roadmap](../../versions/roadmap.md) où la fonctionnalité arrive (V0 → V3). « — » = non prévu à ce jour.
 **Concurrents** : ✅ natif · 🟡 partiel, via plugin/action officielle, configuration manuelle ou plan payant · ❌ absent · ? inconnu (Oxide CI est en alpha 0.1 et seul son README est disponible).
 
 ### 4.1 Modèle et hébergement
@@ -118,7 +118,7 @@ Aucun projet Rust ne propose aujourd'hui une **plateforme CI/CD complète auto-h
 | `when: changed` (chemins modifiés) par job | V2 | 🟡 (orb, config dynamique) | 🟡 | ✅ | 🟡 (au niveau du workflow) | ✅ | 🟡 | ? |
 | Matrix | V2 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ? |
 | Jobs réutilisables / templates | V3 | ✅ (orbs) | ✅ (shared libraries) | ✅ | ✅ | 🟡 | ✅ | 🟡 (plugins) |
-| Actions officielles pour uv, ruff, cargo, clippy… | à fixer | 🟡 (orbs) | 🟡 (plugins) | 🟡 (templates) | 🟡 (souvent tierces) | 🟡 (plugins) | 🟡 (actions GitHub) | ? |
+| Actions officielles pour uv, ruff, cargo, clippy… | V2 | 🟡 (orbs) | 🟡 (plugins) | 🟡 (templates) | 🟡 (souvent tierces) | 🟡 (plugins) | 🟡 (actions GitHub) | ? |
 | Écosystème communautaire | — | ✅ | ✅ | 🟡 | ✅ | 🟡 | ✅ | 🟡 (vise la compatibilité GitHub Actions) |
 
 ### 4.3 Exécution et fiabilité
@@ -147,7 +147,7 @@ Aucun projet Rust ne propose aujourd'hui une **plateforme CI/CD complète auto-h
 | Logs en temps réel | V1 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ? |
 | Artifacts + rétention | V1 | ✅ | ✅ | ✅ | ✅ | 🟡 (plugins) | ✅ | ? |
 | Cache de dépendances | V2 | ✅ | 🟡 | ✅ | ✅ | 🟡 (plugins) | 🟡 | ? |
-| Cache des couches Docker | à fixer | ✅ | 🟡 | 🟡 | 🟡 (`cache-to: type=gha`) | 🟡 | 🟡 | ? |
+| Cache des couches Docker | V2 | ✅ | 🟡 | 🟡 | 🟡 (`cache-to: type=gha`) | 🟡 | 🟡 | ? |
 
 ### 4.5 Sécurité et organisation
 
@@ -171,7 +171,7 @@ Aucun projet Rust ne propose aujourd'hui une **plateforme CI/CD complète auto-h
 
 - **Avantages de Rustkins dès la V1** : placement selon les ressources libres du nœud et file durable avec retry, DLQ et idempotence (presque aucun concurrent ne les fait nativement), retry automatique (absent de GitHub Actions), le tout open source, auto-hébergé et sans forge imposée.
 - **Rattrapage en V2** : services, cache, secrets, matrix, `when: changed`, Kubernetes. Ces fonctions sont standard chez tous les concurrents : elles ne différencient pas, mais leur absence bloque l'adoption.
-- **Cache des couches Docker** : voulu par l'équipe mais absent de la roadmap et de la spécification YAML v3 (dont le cache ne couvre que des fichiers déclarés) ; version à fixer.
+- **Ajouts V2** : cache des couches Docker (distinct du cache déclaratif de fichiers de la spécification YAML v3) et actions officielles pour les outils de base.
 - **Non prévus** : détection des tests instables, découpage des tests selon leur durée. Ce sont les arguments de vente de CircleCI ; à évaluer pour la V3 (proposition, pas une décision).
 - **Oxide CI** est le seul projet Rust comparable (Tokio, agents via NATS, plugins natifs et Wasm), mais il reste une alpha sans offre de service.
 
@@ -188,7 +188,7 @@ Arguments à **défendre** (alignés sur la roadmap et le modèle économique) :
 5. **Stack 100 % auto-hébergeable et souveraine.** PostgreSQL, RabbitMQ, RustFS (S3, Apache 2.0) : aucun service cloud requis, données et logs chez le client, argument RGPD (sans promettre de conformité automatique).
 6. **YAML lisible et déclaratif.** `run_if`, `optional`, `continue_on_error` (V1), puis `when: branch` et `when: changed` (V2) remplacent les expressions `if` et les jobs de détection de changements.
 7. **Accompagnement humain.** Support premium, déploiement sur l'infrastructure du client, développement sur devis : ni Woodpecker ni Forgejo Actions ne proposent d'offre de service.
-8. **Actions officielles pour les outils courants.** Des actions prêtes à l'emploi pour les outils de base (uv, ruff, cargo, clippy, etc.), maintenues par l'équipe Rustkins : un job lint ou test s'écrit en quelques lignes. Comme elles sont officielles, il n'y a pas d'action tierce non auditée dans le pipeline, contrairement au risque supply chain de GitHub Actions (§3.1).
+8. **Actions officielles pour les outils courants (V2).** Des actions prêtes à l'emploi pour les outils de base (uv, ruff, cargo, clippy, etc.), maintenues par l'équipe Rustkins : un job lint ou test s'écrit en quelques lignes. Comme elles sont officielles, il n'y a pas d'action tierce non auditée dans le pipeline, contrairement au risque supply chain de GitHub Actions (§3.1).
 9. **Différenciation V3.** Registry interne, images prébuildées, statistiques et suggestions d'optimisation des pipelines.
 
 **Faiblesses à assumer** : un catalogue d'actions limité aux outils de base, sans écosystème communautaire comparable à GitHub Actions, produit jeune sans base installée, pas de Kubernetes avant la V2, pas de compatibilité avec la syntaxe GitHub Actions (frein à la migration).
