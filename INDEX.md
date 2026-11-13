@@ -51,6 +51,8 @@ Attention : **version de spécification YAML ≠ version du produit**.
 - [Modèle économique de Rustkins](docs/cross-cutting/business-model/business-model.md)
 - [Direction artistique](docs/cross-cutting/art-direction/README.md)
 - [Veille](docs/cross-cutting/technology-watch/README.md)
+- [Veille concurrentielle CI/CD](docs/cross-cutting/technology-watch/competitive-landscape.md)
+- [Veille technologique sur la stack](docs/cross-cutting/technology-watch/tech-stack-watch.md)
 - [Éco-conception](docs/cross-cutting/eco-design/README.md)
 - [Communication](docs/cross-cutting/communication/README.md)
 
