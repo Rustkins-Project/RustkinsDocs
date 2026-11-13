@@ -12,7 +12,7 @@ applies_to: [all]
 
 ## 1. Objet et statut
 
-Ce document définit l'**intention artistique de Rustkins** pour le produit et ses supports de communication. Il fixe une orientation commune, **sans constituer une charte graphique détaillée** : les références de couleurs, les typographies définitives, le logo et ses règles d'emploi ne sont pas arrêtés ici.
+Ce document définit l'**intention artistique de Rustkins** pour le produit et ses supports de communication. Il fixe une orientation commune, distincte de la [charte graphique proposée](graphic-charter.md), qui détaille des premiers choix de palette, de typographie et d'interface. Ces choix restent à valider ; le logo et ses règles d'emploi ne sont pas encore arrêtés.
 
 **Statut :** proposition de direction artistique à valider par l'équipe. Les références citées servent d'inspiration, pas de modèles à reproduire à l'identique.
 
@@ -52,7 +52,7 @@ Un **bleu clair** sert d'accent visuel pour identifier les éléments importants
 | Fond clair blanc cassé | `#F3F5F7` |
 | Accent bleu clair | `#75C9F1` |
 
-Ces références **ne figent pas une charte graphique**. Leurs déclinaisons et leurs contrastes seront vérifiés dans les maquettes, notamment pour les textes et contrôles interactifs.
+Ces références constituent le point de départ de la [charte graphique proposée](graphic-charter.md), qui prévoit notamment une variante interactive foncée pour le thème clair. Les choix seront vérifiés dans les maquettes, notamment pour les textes et contrôles interactifs.
 
 ### 4.2. Typographie et composition
 
