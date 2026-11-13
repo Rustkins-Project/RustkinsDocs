@@ -11,7 +11,7 @@ related_docs: [DOC-0101, DOC-0022, DOC-0021]
 
 # Veille concurrentielle — plateformes CI/CD
 
-> **Date de relevé : 10 novembre 2026.** Les informations marquées *(non vérifié)* proviennent de sources secondaires (blogs, agrégateurs) et doivent être confirmées sur le site officiel avant d'être réutilisées dans un support externe.
+> **Date de relevé : 10 novembre 2026, grille mise à jour le 13 novembre 2026.** Les informations marquées *(non vérifié)* proviennent de sources secondaires (blogs, agrégateurs) et doivent être confirmées sur le site officiel avant d'être réutilisées dans un support externe.
 
 ## 1. Objectif
 
@@ -75,39 +75,106 @@ Rappel du positionnement retenu ([modèle économique](../business-model/busines
 - **Faiblesses** : nécessitent un cluster Kubernetes et une forte expertise.
 - **Enseignement** : hors cible V0–V1 (Docker Compose / Swarm) ; à surveiller pour la cible Kubernetes de la V2.
 
-### 3.8 Projets CI en Rust
+### 3.8 CircleCI
+
+- **Forces** : `resource_class` par job, cache des couches Docker, retry automatique (`max_auto_reruns`, workflow ou step), découpage des tests selon leur durée, détection des tests instables (Insights), orbs réutilisables.
+- **Faiblesses** : SaaS avant tout (le serveur auto-hébergé relève de l'offre entreprise), facturation au crédit, dépend d'une forge externe.
+- **Enseignement** : référence sur l'analyse des tests et l'optimisation, ce que vise la V3 de Rustkins. Ses comparatifs marketing sont à vérifier ligne par ligne.
+
+### 3.9 Projets CI en Rust
 
 | Projet | État | Différence avec Rustkins |
 | --- | --- | --- |
 | FluentCI | Le plus avancé ; exécution **sans conteneurs**, sur Wasm et Nix | Modèle d'exécution différent (pas Docker) |
 | Helipad | Preuve de concept très précoce | Pas de plateforme complète |
-| Oxide CI | Alpha 0.1, projet personnel basé sur Tokio | Pas de roadmap produit ni d'offre de support |
+| Oxide CI | Alpha 0.1 ; Tokio, API HTTP, scheduler et agents via NATS, plugins natifs et Wasm, vise la compatibilité avec GitHub Actions, se construit lui-même | Pas de roadmap produit ni d'offre de support ; Rustkins utilise RabbitMQ plutôt que NATS |
 
 Aucun projet Rust ne propose aujourd'hui une **plateforme CI/CD complète auto-hébergée** (UI, historique, scheduling, artifacts) avec une offre de service. Le créneau est ouvert, mais « écrit en Rust » ne suffit pas comme argument commercial.
 
 ## 4. Grille comparative
 
-Légende : ✅ natif · 🟡 partiel / via plugin / tier payant · ❌ absent · 🗓️ prévu dans la roadmap Rustkins (version indiquée).
+**Colonne Rustkins** : version de la [roadmap](../../versions/roadmap.md) où la fonctionnalité arrive (V0 → V3). « — » = non prévu à ce jour ; « à fixer » = voulu mais sans version.
+**Concurrents** : ✅ natif · 🟡 partiel, via plugin/action officielle, configuration manuelle ou plan payant · ❌ absent · ? inconnu (Oxide CI est en alpha 0.1 et seul son README est disponible).
 
-| Critère | Rustkins | GitHub Actions | GitLab CI | Jenkins | Woodpecker | Forgejo Actions |
-| --- | --- | --- | --- | --- | --- | --- |
-| Open source et gratuit | ✅ | ❌ (runner seul) | 🟡 (CE) | ✅ | ✅ | ✅ |
-| Auto-hébergement complet | ✅ | 🟡 (GHES payant) | ✅ | ✅ | ✅ | ✅ |
-| Indépendant d'une forge | ✅ | ❌ | ❌ | ✅ | 🟡 (OAuth forge) | ❌ |
-| DAG `needs` + fail-fast | ✅ V0 | ✅ | ✅ | 🟡 | ✅ | ✅ |
-| Scheduling CPU/RAM (admission) | 🗓️ V1 | ❌ | ❌ | ❌ | ❌ | ❌ |
-| File durable, retry, DLQ | 🗓️ V1 | n/a | n/a | ❌ | ❌ | ❌ |
-| Logs temps réel | 🗓️ V1 | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Artifacts sur stockage S3 auto-hébergé | 🗓️ V1 | ❌ | ✅ | 🟡 | 🟡 | 🟡 |
-| Services / sidecars | 🗓️ V2 | ✅ | ✅ | 🟡 | ✅ | ✅ |
-| Cache | 🗓️ V2 | ✅ | ✅ | 🟡 | 🟡 | 🟡 |
-| `when: changed` déclaratif | 🗓️ V2 | 🟡 (`paths`) | ✅ (`rules:changes`) | 🟡 | ✅ | 🟡 |
-| Registry et images prébuildées | 🗓️ V3 | ✅ | ✅ | ❌ | ❌ | ✅ |
-| Actions officielles pour les outils de base (uv, ruff, cargo, clippy…) | 🗓️ | 🟡 (souvent tierces) | 🟡 (templates) | 🟡 (plugins) | 🟡 (plugins) | 🟡 (actions GitHub) |
-| Écosystème communautaire d'actions/plugins | ❌ | ✅ | 🟡 | ✅ | 🟡 | ✅ |
-| Support commercial | 🗓️ (premium) | ✅ | ✅ | ✅ (CloudBees) | ❌ | ❌ |
+### 4.1 Modèle et hébergement
 
-> Les cases des concurrents résument la documentation publique et l'usage courant ; les vérifier avant toute publication.
+| Critère | Rustkins | CircleCI | Jenkins | GitLab CI | GitHub Actions | Woodpecker | Gitea/Forgejo Actions | Oxide CI |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Open source et gratuit | V0 | ❌ (SaaS, offre gratuite limitée) | ✅ | 🟡 (CE ; fonctions avancées payantes) | ❌ | ✅ | ✅ | ✅ |
+| Auto-hébergement complet | V0 | 🟡 (runners ; serveur en offre entreprise) | ✅ | ✅ | 🟡 (runners ; GHES payant) | ✅ | ✅ | ✅ |
+| Indépendant d'une forge | V0 | 🟡 (connexion GitHub/GitLab/Bitbucket) | ✅ | ❌ | ❌ | 🟡 (OAuth d'une forge) | ❌ | ? |
+| Support commercial | V0 (premium) | ✅ | ✅ (CloudBees) | ✅ | ✅ | ❌ | 🟡 (Gitea Ltd ; rien pour Forgejo) | ❌ |
+
+### 4.2 Écriture des pipelines
+
+| Critère | Rustkins | CircleCI | Jenkins | GitLab CI | GitHub Actions | Woodpecker | Gitea/Forgejo Actions | Oxide CI |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Pipeline en YAML | V0 | ✅ | 🟡 (Jenkinsfile Groovy) | ✅ | ✅ | ✅ | ✅ | ? |
+| Dépendances entre jobs (DAG) | V0 | ✅ | 🟡 (stages) | ✅ | ✅ | ✅ | ✅ | ? |
+| Fail-fast et jobs `skipped` | V0 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ? |
+| Conditions `always` / `on_failure` | V1 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ? |
+| Jobs optionnels / steps non bloquants | V1 | 🟡 | 🟡 | ✅ | ✅ | ✅ | ✅ | ? |
+| Condition par branche | V1 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ? |
+| `when: changed` (chemins modifiés) par job | V2 | 🟡 (orb, config dynamique) | 🟡 | ✅ | 🟡 (au niveau du workflow) | ✅ | 🟡 | ? |
+| Matrix | V2 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ? |
+| Jobs réutilisables / templates | V3 | ✅ (orbs) | ✅ (shared libraries) | ✅ | ✅ | 🟡 | ✅ | 🟡 (plugins) |
+| Actions officielles pour uv, ruff, cargo, clippy… | à fixer | 🟡 (orbs) | 🟡 (plugins) | 🟡 (templates) | 🟡 (souvent tierces) | 🟡 (plugins) | 🟡 (actions GitHub) | ? |
+| Écosystème communautaire | — | ✅ | ✅ | 🟡 | ✅ | 🟡 | ✅ | 🟡 (vise la compatibilité GitHub Actions) |
+
+### 4.3 Exécution et fiabilité
+
+| Critère | Rustkins | CircleCI | Jenkins | GitLab CI | GitHub Actions | Woodpecker | Gitea/Forgejo Actions | Oxide CI |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Un conteneur par job | V0 | ✅ | 🟡 (plugin Docker) | ✅ | ✅ | ✅ | ✅ | ? |
+| Déclenchement manuel | V0 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Webhooks Git + tokens d'API | V1 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ (API HTTP) |
+| Plusieurs workers | V1 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ (agents via NATS) |
+| Limites CPU/RAM par job | V1 | ✅ (`resource_class`) | 🟡 | 🟡 (config du runner) | 🟡 (larger runners, plans payants) | 🟡 | ? | ? |
+| Placement selon CPU/RAM libres du nœud | V1 | n/a (SaaS) | ❌ | 🟡 (via Kubernetes) | ❌ | 🟡 (via Kubernetes) | ❌ | ? |
+| Annulation d'un run / d'un job | V1 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ? |
+| Retry automatique des jobs en échec | V1 | ✅ (`max_auto_reruns`) | 🟡 (step `retry`) | ✅ (`retry:`) | ❌ (relance manuelle) | ? | ? | ? |
+| File durable, DLQ, idempotence | V1 | n/a | ❌ | n/a | n/a | ❌ | ❌ | 🟡 (NATS) |
+| Services / sidecars (BDD de test) | V2 | ✅ | 🟡 | ✅ | ✅ | ✅ | ✅ | ? |
+| Build Docker rootless | V2 | 🟡 | 🟡 | 🟡 (Kaniko/Buildah) | 🟡 | 🟡 | 🟡 | ? |
+| Kubernetes | V2 | ✅ | ✅ | ✅ | ✅ (ARC) | ✅ | 🟡 | ? |
+| Reprise après crash du serveur | V2 | n/a | 🟡 | ✅ | n/a | ? | ? | ? |
+
+### 4.4 Logs, artifacts, cache
+
+| Critère | Rustkins | CircleCI | Jenkins | GitLab CI | GitHub Actions | Woodpecker | Gitea/Forgejo Actions | Oxide CI |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Logs consultables après exécution | V0 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ? |
+| Logs en temps réel | V1 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ? |
+| Artifacts + rétention | V1 | ✅ | ✅ | ✅ | ✅ | 🟡 (plugins) | ✅ | ? |
+| Cache de dépendances | V2 | ✅ | 🟡 | ✅ | ✅ | 🟡 (plugins) | 🟡 | ? |
+| Cache des couches Docker | — | ✅ | 🟡 | 🟡 | 🟡 (`cache-to: type=gha`) | 🟡 | 🟡 | ? |
+
+### 4.5 Sécurité et organisation
+
+| Critère | Rustkins | CircleCI | Jenkins | GitLab CI | GitHub Actions | Woodpecker | Gitea/Forgejo Actions | Oxide CI |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Authentification et membres d'un projet | V1 | ✅ | ✅ | ✅ | ✅ | 🟡 (via la forge) | ✅ | ? |
+| Secrets chiffrés + masquage dans les logs | V2 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ? |
+| Permissions fines / rôles | V2 | ✅ | 🟡 (plugin) | ✅ | ✅ | 🟡 | 🟡 | ? |
+| Environnements de déploiement | V2 | ✅ | 🟡 | ✅ | ✅ | 🟡 | 🟡 | ? |
+| Registry d'images interne | V3 | ❌ | ❌ | ✅ | ✅ (GHCR) | ❌ | ✅ (packages) | ❌ |
+
+### 4.6 Analyse des tests et optimisation
+
+| Critère | Rustkins | CircleCI | Jenkins | GitLab CI | GitHub Actions | Woodpecker | Gitea/Forgejo Actions | Oxide CI |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Statistiques et suggestions d'optimisation | V3 | ✅ (Insights) | 🟡 (plugins) | 🟡 | 🟡 | ❌ | ❌ | ? |
+| Détection des tests instables (flaky) | — | ✅ | 🟡 (plugin) | 🟡 | ❌ | ❌ | ❌ | ? |
+| Découpage des tests selon leur durée | — | ✅ | 🟡 (plugin) | 🟡 (`parallel:` + script) | 🟡 (matrix + script) | 🟡 | 🟡 | ? |
+
+### 4.7 Lecture de la grille
+
+- **Avantages de Rustkins dès la V1** : placement selon les ressources libres du nœud et file durable avec retry, DLQ et idempotence (presque aucun concurrent ne les fait nativement), retry automatique (absent de GitHub Actions), le tout open source, auto-hébergé et sans forge imposée.
+- **Rattrapage en V2** : services, cache, secrets, matrix, `when: changed`, Kubernetes. Ces fonctions sont standard chez tous les concurrents : elles ne différencient pas, mais leur absence bloque l'adoption.
+- **Non prévus** : cache des couches Docker, détection des tests instables, découpage des tests selon leur durée. Ce sont les arguments de vente de CircleCI ; à évaluer pour la V3 (proposition, pas une décision).
+- **Oxide CI** est le seul projet Rust comparable (Tokio, agents via NATS, plugins natifs et Wasm), mais il reste une alpha sans offre de service.
+
+> Les cases concurrentes résument la documentation publique et des sources secondaires au 13/11/2026. Vérifier une case avant de la citer à l'extérieur, et se méfier des comparatifs publiés par les éditeurs eux-mêmes (ex. le tableau CircleCI vs GitHub Actions, qui marque ❌ des fonctions disponibles via une action officielle ou un plan payant).
 
 ## 5. Ce qui différencie Rustkins
 
@@ -157,3 +224,9 @@ Arguments à **défendre** (alignés sur la roadmap et le modèle économique) :
 - MinIO CE en 2026 — https://glukhov.org/data-infrastructure/object-storage/minio-dead/
 - OpenSSF, CRA Stewards One Pager — https://policy.openssf.org/CRA/stewards-one-pager.html
 - Obligations de signalement CRA au 11 septembre — https://pasqualepillitteri.it/en/news/15586/cyber-resilience-act-reporting-obligations-september-11
+- CircleCI, Automatic reruns — https://circleci.com/docs/guides/orchestrate/automatic-reruns/
+- GitHub, re-run workflows and jobs — https://docs.github.com/en/enterprise-server@3.15/actions/how-tos/manage-workflow-runs/re-run-workflows-and-jobs
+- GitHub, larger runners — https://docs.github.com/de/enterprise-cloud@latest/actions/concepts/runners/about-larger-runners · https://github.blog/changelog/2025-04-09-github-actions-hosted-runner-fleet-now-incudes-96-vcpu-larger-runner/
+- Docker, GitHub Actions cache backend — https://docs.docker.com/build/cache/backends/gha/
+- Woodpecker, workflow syntax — https://woodpecker-ci.org/docs/usage/workflow-syntax
+- Oxide CI — https://github.com/copyleftdev/oxide-ci
