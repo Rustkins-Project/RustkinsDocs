@@ -6,6 +6,7 @@ status: draft
 summary: "Modèle de sécurité V1 : authentification JWT, refresh tokens, autorisations de projet, jetons API et signatures de webhooks."
 topics: [security, authentication, authorization, jwt, webhooks]
 applies_to: [V1]
+related_adrs: [ADR-0001]
 ---
 
 # ARCH-05 --- Security (Rustkins V1)
@@ -55,6 +56,22 @@ API --> RabbitMQ
 ```
 
 PostgreSQL is the authoritative source for identities and permissions.
+
+Worker isolation
+
+Workers execute arbitrary code from repositories. They therefore have
+**no access to PostgreSQL**: no credentials and no network route
+([ADR-0001](../../../../decisions/ADR-0001-worker-scheduler-communication.md)).
+
+-   Workers receive self-contained execution orders from the Scheduler
+    through RabbitMQ and report events back on `rustkins.events`.
+-   The Scheduler validates every event (sender Worker, attempt, state
+    transition) before writing it.
+-   Worker RabbitMQ permissions are restricted: read their own job
+    queue and the control queue, write to `rustkins.events` and
+    `rustkins.logs` only.
+-   Worker RustFS credentials should be restricted to the `runs/`
+    prefix.
 
 ------------------------------------------------------------------------
 

@@ -160,7 +160,6 @@ flowchart TD
   Scheduler --> MQ
 
   Worker[Worker container] --> MQ
-  Worker --> PG
   Worker --> FS
   Worker --> Git
   Worker --> DockerSocket[/Docker socket/]
@@ -236,8 +235,7 @@ flowchart TD
     Scheduler --> MQ
 
     Worker --> MQ
-    Worker --> PG
-    Worker --> FS
+      Worker --> FS
     Worker --> DockerSock[/var/run/docker.sock/]
 
     PG --> PGVolume
@@ -433,15 +431,9 @@ Règles V0 recommandées :
 
 ---
 
-### 9.7 Worker → PostgreSQL
+### 9.7 Worker → Scheduler
 
-Le Worker met à jour :
-
-- le statut du job ;
-- le statut des steps ;
-- les timestamps `started_at` / `finished_at` ;
-- les codes de retour ;
-- la référence du fichier de logs dans RustFS.
+Le Worker n'accède pas à PostgreSQL ([ADR-0001](../../../decisions/ADR-0001-worker-scheduler-communication.md)). Il signale au Scheduler, via RabbitMQ, le début et la fin de chaque job. Le Scheduler écrit les statuts, les codes de retour et la référence du fichier de logs, puis publie les jobs suivants.
 
 ---
 
@@ -801,25 +793,27 @@ sequenceDiagram
   Scheduler->>MQ: Publie JobRunRequested(build)
 
   Worker->>MQ: Consomme JobRunRequested(build)
-  Worker->>PG: Marque build running
+  Worker->>MQ: Signale build démarré
   Worker->>Git: Clone repo au SHA
   Worker->>Docker: Pull image node:22
   Worker->>Docker: Create/start container
   Docker->>Job: Exécute npm install puis npm run build
   Worker->>FS: Écrit logs build
-  Worker->>PG: Marque build success/failed
+  Worker->>MQ: Signale build terminé
   Worker->>MQ: Ack message
 
+  Scheduler->>PG: Marque build success/failed
   Scheduler->>PG: Détecte test prêt si build success
   Scheduler->>PG: Marque test queued
   Scheduler->>MQ: Publie JobRunRequested(test)
 
   Worker->>MQ: Consomme JobRunRequested(test)
-  Worker->>PG: Marque test running
+  Worker->>MQ: Signale test démarré
   Worker->>Docker: Create/start container
   Docker->>Job: Exécute npm test
   Worker->>FS: Écrit logs test
-  Worker->>PG: Marque test success/failed
+  Worker->>MQ: Signale test terminé
+  Scheduler->>PG: Marque test success/failed
 
   Scheduler->>PG: Calcule statut final du run
   UI->>API: GET /api/runs/{id}
@@ -917,7 +911,6 @@ services:
   worker:
     image: rustkins/worker:dev
     environment:
-      DATABASE_URL: postgres://rustkins:rustkins@postgres:5432/rustkins
       RABBITMQ_URL: amqp://rustkins:rustkins@rabbitmq:5672
       RUSTFS_ENDPOINT: http://rustfs:9000
       RUSTFS_ACCESS_KEY: rustkins
@@ -927,7 +920,6 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - worker_workdir:/workdir
     depends_on:
-      - postgres
       - rabbitmq
       - rustfs
     networks:
@@ -1072,7 +1064,6 @@ services:
   worker:
     image: rustkins/worker:v0
     environment:
-      DATABASE_URL: postgres://rustkins:rustkins@postgres:5432/rustkins
       RABBITMQ_URL: amqp://rustkins:rustkins@rabbitmq:5672
       RUSTFS_ENDPOINT: http://rustfs:9000
       RUSTFS_ACCESS_KEY: rustkins
@@ -1208,7 +1199,6 @@ SCHEDULER_POLL_INTERVAL_SECONDS
 ### Worker
 
 ```txt
-DATABASE_URL
 RABBITMQ_URL
 RUSTFS_ENDPOINT
 RUSTFS_ACCESS_KEY

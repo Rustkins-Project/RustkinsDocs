@@ -79,7 +79,7 @@ API->>API: Verify HMAC
 API->>Scheduler: Build PipelineRun
 Scheduler->>API: PipelineRun queued
 Scheduler->>Scheduler: Create dispatch outbox messages
-OutboxPublisher->>RabbitMQ: Publish job.ready
+OutboxPublisher->>RabbitMQ: Publish job.assigned
 RabbitMQ->>Worker: Deliver job
 ```
 
