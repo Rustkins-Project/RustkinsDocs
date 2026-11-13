@@ -143,6 +143,9 @@ Contains
 -   last_sequence
 -   timestamps
 
+Written by the Scheduler from the `job.finished` event of the Worker
+(log key, size). Workers never access PostgreSQL.
+
 ## LOG_EVENT
 
 Runtime representation

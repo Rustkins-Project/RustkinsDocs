@@ -6,6 +6,7 @@ status: draft
 summary: "Architecture et responsabilités du Worker V1 : récupération Git, exécution Docker, logs, artéfacts et états des jobs."
 topics: [worker, docker, git, execution]
 applies_to: [V1]
+related_adrs: [ADR-0001]
 ---
 
 # ARCH-09 --- Worker Architecture (Rustkins V1)
@@ -38,8 +39,8 @@ Out of scope:
 
 The Worker is responsible for:
 
--   Consuming JobRun messages from RabbitMQ
--   Validating JobRun state
+-   Consuming JobRun execution orders from its own RabbitMQ queue
+-   Detecting duplicate deliveries
 -   Cloning the repository
 -   Checking out the requested Git SHA
 -   Preparing the execution environment
@@ -47,8 +48,8 @@ The Worker is responsible for:
 -   Executing the Docker container
 -   Streaming logs
 -   Uploading artifacts
--   Updating runtime state
--   Reporting completion to the Scheduler
+-   Reporting job and step events to the Scheduler
+-   Publishing its heartbeat
 
 The Worker MUST NEVER:
 
@@ -57,6 +58,7 @@ The Worker MUST NEVER:
 -   Allocate resources
 -   Release reserved resources
 -   Create PipelineRuns
+-   Access PostgreSQL (see [ADR-0001](../../../../decisions/ADR-0001-worker-scheduler-communication.md))
 
 ------------------------------------------------------------------------
 
@@ -65,14 +67,17 @@ The Worker MUST NEVER:
 ``` mermaid
 flowchart LR
 
-RabbitMQ --> Worker
-Worker --> PostgreSQL
+RabbitMQ -->|job.assigned / cancel| Worker
+Worker -->|events / log chunks| RabbitMQ
 Worker --> Git
 Worker --> Docker
 Docker --> Worker
 Worker --> RustFS
-Worker --> RabbitMQ
 ```
+
+The Worker has no access to PostgreSQL. It receives self-contained
+execution orders from the Scheduler and reports back through
+`rustkins.events`. The Scheduler is the only writer of runtime state.
 
 ------------------------------------------------------------------------
 
@@ -100,24 +105,27 @@ sequenceDiagram
 
 participant MQ as RabbitMQ
 participant W as Worker
-participant DB as PostgreSQL
 participant Git
 participant Docker
 participant RustFS
 
-MQ->>W: Job message
-W->>DB: Load JobRun
-W->>DB: Validate status
+MQ->>W: job.assigned (self-contained order)
+W->>W: Check local duplicate registry
+W->>MQ: Publish job.started
 W->>Git: Clone repository
 W->>Git: Checkout commit SHA
 W->>RustFS: Restore upstream artifacts
 W->>Docker: Start container
 Docker-->>W: stdout / stderr
 W->>RustFS: Persist logs
+W->>MQ: Publish step.finished (per step)
 W->>RustFS: Upload artifacts
-W->>DB: Update JobRun
-W->>MQ: ACK
+W->>MQ: Publish job.finished (confirmed)
+W->>MQ: ACK job.assigned
 ```
+
+The Scheduler consumes these events, writes the state into PostgreSQL
+and sends the next jobs.
 
 ------------------------------------------------------------------------
 
@@ -126,9 +134,10 @@ W->>MQ: ACK
 Before execution the Worker:
 
 1.  Clones the repository.
-2.  Checks out the Git SHA referenced by the PipelineRun.
+2.  Checks out the Git SHA given in the execution order.
 3.  Loads the workspace.
-4.  Restores artifacts from dependency JobRuns.
+4.  Restores the upstream artifacts listed in the execution order
+    (RustFS keys and checksums resolved by the Scheduler).
 5.  Starts the execution container.
 
 The Worker must always execute the exact Git revision associated with
@@ -161,6 +170,9 @@ If a step exits with code `0`:
 ``` text
 StepRun = success
 ```
+
+Step definitions, including `continue_on_error`, and the optional flag
+of the job are part of the execution order.
 
 If a step exits with a non-zero code and
 `PipelineVersionStep.continue_on_error = true`:
@@ -212,24 +224,30 @@ When execution finishes:
 3.  Create tar.gz archive(s).
 4.  Compute SHA-256 checksum.
 5.  Upload to RustFS.
-6.  Persist Artifact metadata.
+6.  Include Artifact metadata (name, RustFS key, size, checksum) in
+    the `job.finished` event. The Scheduler persists it.
 
 ------------------------------------------------------------------------
 
 # 11. Status Updates
 
-The Worker updates JobRun states:
+The Worker never writes states. It publishes events on
+`rustkins.events`; the Scheduler validates each transition and writes
+it into PostgreSQL.
 
-``` text
-running
-success
-warning
-failed
-cancelled
-```
+  Event             Resulting JobRun / StepRun state
+  ----------------- ------------------------------------------------
+  `job.started`     JobRun `running`
+  `step.finished`   StepRun `success`, `warning` or `failed`
+  `job.finished`    JobRun `success`, `warning`, `failed` or `cancelled`
 
-The Worker reports infrastructure failures through the JobRun state and
-error details.
+`job.finished` also carries exit code, timestamps, infrastructure error
+details, log object key and size, artifact metadata and measured
+resource usage.
+
+Events are published with RabbitMQ publisher confirms. `job.finished`
+is kept in a local spool until confirmed, and republished after a
+Worker restart.
 
 The Scheduler decides whether the next state becomes `retrying` or
 `dead_lettered`.
@@ -244,8 +262,8 @@ When a cancel request is received:
 2.  Stop the Docker container.
 3.  Flush remaining logs.
 4.  Upload completed artifacts (if applicable).
-5.  Persist final state.
-6.  Let the Scheduler release reserved resources.
+5.  Publish `job.finished` with status `cancelled`.
+6.  Let the Scheduler persist the state and release reserved resources.
 
 If the container cannot be stopped within the timeout, the JobRun
 transitions to `failed`.
@@ -254,15 +272,15 @@ transitions to `failed`.
 
 # 13. Idempotency
 
-Before processing a message the Worker reloads the JobRun.
+RabbitMQ guarantees at-least-once delivery.
 
-If the JobRun is already completed:
+The Worker keeps a local registry of accepted `job_run_id:attempt`
+pairs. A duplicate `job.assigned` delivery is acknowledged without
+execution.
 
--   Success
--   Failed
--   Cancelled
-
-The message is acknowledged without execution.
+The Scheduler remains the final arbiter: if it receives a `job.started`
+for a JobRun that is no longer `queued` for this attempt and this
+Worker, it ignores the event and publishes `cancel.job`.
 
 Duplicate execution must never occur.
 
@@ -270,14 +288,14 @@ Duplicate execution must never occur.
 
 # 14. Heartbeat
 
-Each Worker periodically publishes its health.
+At startup the Worker publishes `worker.registered` (worker id, CPU
+and memory capacity, version).
 
-Heartbeat updates:
+Then it periodically publishes `worker.heartbeat` (worker id, running
+jobs) on `rustkins.events`.
 
--   last_heartbeat_at
--   status
-
-Scheduler uses this information to detect offline Workers.
+The Scheduler updates `last_heartbeat_at` and `status`, and uses this
+information to detect offline Workers.
 
 ------------------------------------------------------------------------
 
@@ -303,7 +321,8 @@ Business failures (tests, compilation, commands) do not trigger retries.
 -   One Docker container belongs to one JobRun.
 -   Workers never modify scheduling decisions.
 -   Workers never reserve or release worker capacity.
--   PostgreSQL remains the source of truth.
+-   Workers never access PostgreSQL.
+-   PostgreSQL remains the source of truth, written by the Scheduler.
 
 ------------------------------------------------------------------------
 
@@ -313,11 +332,13 @@ Business failures (tests, compilation, commands) do not trigger retries.
 
 Decision
 
-Workers are stateless executors.
+Workers are stateless executors that communicate only with the
+Scheduler, through RabbitMQ.
 
 Consequence
 
-All execution state is stored externally.
+All execution state is stored externally, by the Scheduler. See
+[ADR-0001](../../../../decisions/ADR-0001-worker-scheduler-communication.md).
 
 ------------------------------------------------------------------------
 

@@ -78,20 +78,25 @@ PipelineVersion --> Scheduler
 Scheduler --> PostgreSQL
 PostgreSQL --> OutboxPublisher
 OutboxPublisher --> RabbitMQ
-RabbitMQ --> Worker
+RabbitMQ -->|job.assigned| Worker
 Worker --> Docker
 Docker --> RustFS
-Worker --> PostgreSQL
+Worker -->|events| RabbitMQ
+RabbitMQ -->|events| Scheduler
 ```
+
+Workers never access PostgreSQL. They receive self-contained execution
+orders and report events to the Scheduler, which is the only writer of
+runtime state ([ADR-0001](../../../decisions/ADR-0001-worker-scheduler-communication.md)).
 
 Responsibilities:
 
   Component    Responsibility
   ------------ -----------------------------------------
   API          Receive requests and webhooks
-  Scheduler    Build execution graph and dispatch jobs
+  Scheduler    Build execution graph, dispatch jobs, persist Worker events
   OutboxPublisher Publish durable outbox messages to RabbitMQ
-  Worker       Execute Docker containers
+  Worker       Execute Docker containers and report events
   PostgreSQL   Source of truth
   RabbitMQ     Transport layer
   RustFS       Persistent storage
@@ -248,7 +253,8 @@ outbox.
 
 ### running
 
-Worker acknowledged message. Container started.
+The Worker received the job and published `job.started`; the
+Scheduler persisted the state.
 
 ### success
 
@@ -410,7 +416,7 @@ Running jobs
 1.  status = cancel_requested
 2.  create cancel OutboxMessage
 3.  worker stops container
-4.  worker confirms cancellation
+4.  worker confirms with `job.finished` (status `cancelled`)
 5.  scheduler releases resources
 6.  status = cancelled
 
@@ -424,16 +430,18 @@ status becomes failed.
 
 RabbitMQ provides at-least-once delivery.
 
-Workers must therefore validate JobRun before execution.
+Workers keep a local registry of accepted `job_run_id:attempt` pairs.
+Duplicate messages are ACKed without execution.
+
+The Scheduler validates every Worker event against the JobRun state.
 
 Rules
 
--   already success -\> ignore
--   already failed -\> ignore
--   already cancelled -\> ignore
--   already running elsewhere -\> ignore
-
-Duplicate messages are ACKed without execution.
+-   already success -\> ignore the event
+-   already failed -\> ignore the event
+-   already cancelled -\> ignore the event
+-   already running elsewhere or stale attempt -\> ignore the event
+    and send `cancel.job` to the sender
 
 ------------------------------------------------------------------------
 
@@ -480,14 +488,17 @@ participant Docker
 API->>Scheduler: Create PipelineRun
 Scheduler->>Scheduler: Build DAG
 Scheduler->>Scheduler: Reserve resources
-Scheduler->>Scheduler: Insert OutboxMessage(job.ready)
+Scheduler->>Scheduler: Insert OutboxMessage(job.assigned)
 OutboxPublisher->>RabbitMQ: Publish outbox message
-RabbitMQ->>Worker: Job message
+RabbitMQ->>Worker: job.assigned
+Worker->>RabbitMQ: job.started
+RabbitMQ->>Scheduler: job.started
 Worker->>Docker: Start container
 Docker-->>Worker: Exit code
-Worker->>Scheduler: Update JobRun
-Scheduler->>Scheduler: Release resources
-Scheduler->>Scheduler: Unlock dependent jobs
+Worker->>RabbitMQ: job.finished
+RabbitMQ->>Scheduler: job.finished
+Scheduler->>Scheduler: Persist state, release resources
+Scheduler->>Scheduler: Unlock dependent jobs, assign next jobs
 ```
 
 ------------------------------------------------------------------------
@@ -504,6 +515,8 @@ The following rules MUST always remain true.
 -   Scheduler is the only component allowed to reserve or release worker capacity.
 -   Every runtime RabbitMQ message is first persisted as an OutboxMessage.
 -   Workers never modify DAG topology.
+-   Workers never access PostgreSQL; the Scheduler is the only writer
+    of runtime execution state.
 -   A completed JobRun never returns to running.
 -   Dead-lettered jobs require manual retry.
 -   PostgreSQL is the single source of truth.

@@ -6,6 +6,7 @@ status: draft
 summary: "Architecture RabbitMQ V1 : échanges, files, transport des ordres de jobs, annulations, logs et publication par outbox."
 topics: [rabbitmq, messaging, outbox, worker]
 applies_to: [V1]
+related_adrs: [ADR-0001]
 ---
 
 # ARCH-02 --- RabbitMQ Architecture (Rustkins V1)
@@ -22,12 +23,16 @@ RabbitMQ is **not** the source of truth.
 
 Responsibilities:
 
--   transport execution orders
+-   transport execution orders from the Scheduler to a given Worker
+-   transport Worker events (job progress, completion, heartbeat) to
+    the Scheduler
 -   transport cancellation requests
 -   transport log chunks
 -   decouple API, Scheduler and Workers
 
-PostgreSQL remains the authoritative state.
+PostgreSQL remains the authoritative state. Only the Scheduler (and the
+API for user-facing data) writes it; Workers never access PostgreSQL
+([ADR-0001](../../../../decisions/ADR-0001-worker-scheduler-communication.md)).
 
 RabbitMQ publication is driven by a PostgreSQL transactional outbox.
 
@@ -49,12 +54,13 @@ Scheduler --> PostgreSQL
 PostgreSQL --> OutboxPublisher
 OutboxPublisher --> RabbitMQ
 
-RabbitMQ --> Worker
-Worker --> PostgreSQL
+RabbitMQ -->|job.assigned / cancel| Worker
 Worker --> RustFS
 
-Worker --> RabbitMQ
-RabbitMQ --> API
+Worker -->|events / log chunks| RabbitMQ
+RabbitMQ -->|events| Scheduler
+Scheduler --> PostgreSQL
+RabbitMQ -->|log chunks| API
 API --> Browser
 ```
 
@@ -62,25 +68,30 @@ API --> Browser
 
 # 3. Exchanges
 
-Three exchanges are defined.
+Four exchanges are defined.
 
   Exchange           Type     Purpose
-  ------------------ -------- -----------------
-  rustkins.jobs      direct   Job execution
+  ------------------ -------- ----------------------------------
+  rustkins.jobs      direct   Job execution orders per Worker
   rustkins.control   fanout   Runtime control
+  rustkins.events    topic    Worker events to the Scheduler
   rustkins.logs      topic    Real-time logs
 
 ------------------------------------------------------------------------
 
 # 4. Queues
 
-  Queue                       Consumer            Description
-  --------------------------- ------------------- -------------------------
-  rustkins.jobs.ready.q       Workers             Runnable jobs
-  rustkins.jobs.retry.q       Scheduler           Delayed retry
-  rustkins.jobs.dlq           Operators           Dead Letter Queue
-  rustkins.control.cancel.q   Workers             Cancellation broadcast
-  rustkins.logs.sse.q         API                 Real-time log streaming
+  Queue                                Consumer     Description
+  ------------------------------------ ------------ -----------------------------
+  rustkins.jobs.worker.{worker_id}.q   One Worker   Jobs assigned to this Worker
+  rustkins.jobs.retry.q                Scheduler    Delayed retry
+  rustkins.jobs.dlq                    Operators    Dead Letter Queue
+  rustkins.control.cancel.q            Workers      Cancellation broadcast
+  rustkins.events.scheduler.q          Scheduler    Worker events
+  rustkins.logs.sse.q                  API          Real-time log streaming
+
+Each Worker declares its own job queue at startup. The Scheduler routes
+a job only to the Worker on which it reserved resources.
 
 ------------------------------------------------------------------------
 
@@ -89,7 +100,7 @@ Three exchanges are defined.
 ## rustkins.jobs
 
 ``` text
-job.ready
+worker.{worker_id}
 job.retry
 ```
 
@@ -100,6 +111,16 @@ cancel.job
 cancel.run
 ```
 
+## rustkins.events
+
+``` text
+worker.registered
+worker.heartbeat
+job.started
+step.finished
+job.finished
+```
+
 ## rustkins.logs
 
 ``` text
@@ -108,24 +129,45 @@ logs.{job_run_id}
 
 ------------------------------------------------------------------------
 
-# 6. Job message
+# 6. Job message (`job.assigned`)
 
 ``` json
 {
   "message_id":"uuid",
+  "type":"job.assigned",
+  "worker_id":"uuid",
   "pipeline_run_id":"uuid",
   "job_run_id":"uuid",
   "pipeline_version_job_id":"uuid",
   "project_id":"uuid",
   "attempt":1,
-  "idempotency_key":"run:job",
+  "idempotency_key":"run:job:attempt",
+  "repository":{"url":"https://git.example.com/org/repo.git","commit_sha":"sha"},
+  "job":{
+    "name":"build",
+    "image":"node:22",
+    "optional":false,
+    "timeout_seconds":3600,
+    "resources":{"cpu_milli":1000,"memory_mb":1024},
+    "env":{"NODE_ENV":"test"},
+    "steps":[
+      {"index":0,"name":"install","run":"npm ci","continue_on_error":false}
+    ],
+    "artifacts":{"paths":["dist/"]}
+  },
+  "restore_artifacts":[
+    {"artifact_id":"uuid","object_key":"runs/.../artifacts/uuid.tar.gz","sha256":"..."}
+  ],
   "created_at":"2026-01-01T12:00:00Z"
 }
 ```
 
-Only identifiers are transported.
+The message is a **self-contained execution order**: the Worker never
+reads PostgreSQL. The Scheduler resolves everything, including the
+upstream artifacts to restore, before publishing.
 
-Workers always reload runtime information from PostgreSQL.
+Secrets are out of scope for V1. When secrets are introduced, they must
+not be stored in the outbox in clear text.
 
 ------------------------------------------------------------------------
 
@@ -142,7 +184,8 @@ Workers always reload runtime information from PostgreSQL.
 
 Cancellation is broadcast to all workers.
 
-Only the worker executing the job reacts.
+Only the worker executing the job reacts. It confirms with a
+`job.finished` event whose status is `cancelled`.
 
 Cancel messages are also published through the transactional outbox.
 
@@ -168,7 +211,45 @@ Maximum chunk size:
 
 ------------------------------------------------------------------------
 
-# 9. Transactional outbox
+# 9. Worker events
+
+Workers publish events on `rustkins.events`. The Scheduler consumes
+them from `rustkins.events.scheduler.q`.
+
+Example `job.finished`:
+
+``` json
+{
+  "event_id":"uuid",
+  "type":"job.finished",
+  "worker_id":"uuid",
+  "job_run_id":"uuid",
+  "attempt":1,
+  "status":"success",
+  "exit_code":0,
+  "started_at":"2026-01-01T12:00:00Z",
+  "finished_at":"2026-01-01T12:03:10Z",
+  "error":null,
+  "log":{"object_key":"runs/.../logs.txt","size_bytes":48213},
+  "artifacts":[
+    {"name":"dist","object_key":"runs/.../artifacts/uuid.tar.gz","size_bytes":1048576,"sha256":"..."}
+  ],
+  "resource_usage":{"cpu_seconds":95.2,"memory_peak_mb":612}
+}
+```
+
+Rules:
+
+-   Workers publish with publisher confirms.
+-   `job.finished` is kept in a local spool on the Worker until
+    confirmed, and republished after a restart.
+-   The Scheduler validates the sender, the attempt and the state
+    transition, writes the state, then ACKs the event after commit.
+-   Duplicate or stale events are ignored and acknowledged.
+
+------------------------------------------------------------------------
+
+# 10. Transactional outbox
 
 RabbitMQ messages that affect execution state are never published
 directly inside the scheduling transaction.
@@ -214,12 +295,14 @@ If the Outbox Publisher crashes after publishing to RabbitMQ but before
 marking the OutboxMessage as `published`, the message may be published
 again.
 
-This is acceptable because workers always reload JobRun state from
-PostgreSQL and ACK duplicate deliveries without executing them twice.
+This is acceptable because Workers keep a local registry of accepted
+`job_run_id:attempt` pairs and ACK duplicate deliveries without
+executing them twice. The Scheduler also rejects unexpected
+`job.started` events (see §15).
 
 ------------------------------------------------------------------------
 
-# 10. Message lifecycle
+# 11. Message lifecycle
 
 ``` mermaid
 sequenceDiagram
@@ -230,32 +313,36 @@ participant MQ
 participant Worker
 
 Scheduler->>DB: Reserve resources
-Scheduler->>DB: Insert OutboxMessage(job.ready)
+Scheduler->>DB: Insert OutboxMessage(job.assigned)
 Publisher->>DB: Load pending OutboxMessage
-Publisher->>MQ: Publish job.ready
+Publisher->>MQ: Publish job.assigned (worker.{id})
 Publisher->>DB: Mark OutboxMessage published
 MQ->>Worker: Deliver message
-Worker->>DB: Load JobRun
+Worker->>MQ: Publish job.started
+MQ->>Scheduler: job.started
+Scheduler->>DB: JobRun = running
 Worker->>Worker: Execute container
-Worker->>DB: Update status
-Worker->>MQ: ACK
-Scheduler->>DB: Release resources
+Worker->>MQ: Publish job.finished
+Worker->>MQ: ACK job.assigned
+MQ->>Scheduler: job.finished
+Scheduler->>DB: Final state, release resources, assign next jobs
+Scheduler->>MQ: ACK event
 ```
 
 ------------------------------------------------------------------------
 
-# 11. ACK / NACK policy
+# 12. ACK / NACK policy
 
 ## ACK
 
-ACK is sent only after:
+The Worker ACKs `job.assigned` only after:
 
--   JobRun updated
--   artifacts uploaded
 -   logs finalized
+-   artifacts uploaded
+-   `job.finished` confirmed by RabbitMQ
 
-Resource release is performed by the Scheduler after it observes the
-final JobRun state.
+Resource release is performed by the Scheduler when it processes
+`job.finished`.
 
 ## Business failure
 
@@ -267,7 +354,7 @@ Examples:
 Action:
 
 ``` text
-Status = failed
+job.finished(status = failed)
 ACK
 ```
 
@@ -282,14 +369,14 @@ Examples:
 Action:
 
 ``` text
-Status = failed with infrastructure error
+job.finished(status = failed, infrastructure error)
 ACK current message
 Scheduler schedules retry
 ```
 
 ------------------------------------------------------------------------
 
-# 12. Retry policy
+# 13. Retry policy
 
 Maximum attempts
 
@@ -323,7 +410,7 @@ Non retryable
 
 ------------------------------------------------------------------------
 
-# 13. Dead Letter Queue
+# 14. Dead Letter Queue
 
 After maximum retries:
 
@@ -341,22 +428,28 @@ Dead-lettered jobs require manual retry.
 
 ------------------------------------------------------------------------
 
-# 14. Idempotency
+# 15. Idempotency
 
 RabbitMQ guarantees at-least-once delivery.
 
 Workers must always:
 
-1.  Load JobRun.
-2.  Validate current status.
-3.  Ignore already completed executions.
-4.  ACK duplicate deliveries.
+1.  Check the local registry of accepted `job_run_id:attempt` pairs.
+2.  ACK duplicate deliveries without execution.
+
+The Scheduler must always:
+
+1.  Validate the sender Worker, the attempt and the state transition
+    of every event.
+2.  Ignore and ACK duplicate or stale events.
+3.  Publish `cancel.job` when a `job.started` targets a JobRun that is
+    no longer `queued` for this attempt and this Worker.
 
 Duplicate execution must never occur.
 
 ------------------------------------------------------------------------
 
-# 15. Ordering
+# 16. Ordering
 
 RabbitMQ ordering is never trusted.
 
@@ -370,7 +463,7 @@ Workers execute only received jobs.
 
 ------------------------------------------------------------------------
 
-# 16. Failure scenarios
+# 17. Failure scenarios
 
 ## Worker crashes
 
@@ -384,8 +477,9 @@ Workers execute only received jobs.
 Outbox Publisher republishes `pending` or `publishing` messages using
 OutboxMessage state.
 
-Workers still reload JobRun state from PostgreSQL, so duplicate
-publication is safe.
+Duplicate publication is safe thanks to the idempotency rules (§15).
+Workers republish unconfirmed `job.finished` events from their local
+spool.
 
 ## API unavailable
 
@@ -395,7 +489,7 @@ Real-time logs are temporarily unavailable.
 
 ------------------------------------------------------------------------
 
-# 17. ADR
+# 18. ADR
 
 ## ADR-001
 
@@ -409,11 +503,12 @@ Database remains the single source of truth.
 
 ## ADR-002
 
-Workers are stateless.
+Workers are stateless and never access PostgreSQL.
 
 Consequence:
 
-Every execution starts by reading PostgreSQL.
+Execution orders are self-contained and Workers report through
+`rustkins.events`. See [ADR-0001](../../../../decisions/ADR-0001-worker-scheduler-communication.md).
 
 ------------------------------------------------------------------------
 
@@ -437,12 +532,12 @@ Simpler multi-worker implementation for V1.
 
 ------------------------------------------------------------------------
 
-# 18. Future evolution
+# 19. Future evolution
 
 V2 candidates
 
 -   Priority queues
--   Worker-specific queues
+-   One RabbitMQ account per Worker
 -   Delayed exchanges
 -   Multi-tenant isolation
 -   Queue metrics

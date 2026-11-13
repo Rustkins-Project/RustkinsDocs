@@ -6,6 +6,7 @@ status: draft
 summary: "Allocation et réservation de CPU et mémoire pour répartir les jobs entre workers sans dépasser leurs capacités."
 topics: [scheduler, resources, worker, cpu, memory]
 applies_to: [V1]
+related_adrs: [ADR-0001]
 ---
 
 # ARCH-06 --- Resource Scheduling (Rustkins V1)
@@ -45,10 +46,11 @@ PipelineRun --> Scheduler
 Scheduler --> PostgreSQL
 PostgreSQL --> OutboxPublisher
 OutboxPublisher --> RabbitMQ
-RabbitMQ --> Worker
+RabbitMQ -->|job.assigned| Worker
 Worker --> Docker
 
-Worker --> PostgreSQL
+Worker -->|events| RabbitMQ
+RabbitMQ -->|events| Scheduler
 ```
 
 The Scheduler is the only component allowed to decide where a job
@@ -151,12 +153,16 @@ participant Worker
 Scheduler->>PostgreSQL: Find compatible worker
 Scheduler->>PostgreSQL: Reserve CPU & Memory
 Scheduler->>PostgreSQL: JobRun = queued
-Scheduler->>PostgreSQL: Insert OutboxMessage(job.ready)
+Scheduler->>PostgreSQL: Insert OutboxMessage(job.assigned)
 
-Publisher->>RabbitMQ: Publish job.ready
+Publisher->>RabbitMQ: Publish job.assigned (worker.{id})
 RabbitMQ->>Worker: Job message
-Worker->>PostgreSQL: JobRun = running
+Worker->>RabbitMQ: job.started
+RabbitMQ->>Scheduler: job.started
+Scheduler->>PostgreSQL: JobRun = running
 ```
+
+The job is routed to the queue of the selected Worker only.
 
 Reservation and OutboxMessage creation occur in the same PostgreSQL
 transaction.
@@ -181,10 +187,13 @@ The Worker does not modify `reserved_cpu_milli` or
 
 Normal completion flow:
 
-1.  Worker updates the JobRun execution result.
-2.  Scheduler observes the final JobRun state.
+1.  Worker publishes `job.finished` with the execution result.
+2.  Scheduler validates the event and writes the final JobRun state.
 3.  Scheduler releases the reserved CPU and memory.
-4.  Scheduler unlocks dependent jobs or completes the PipelineRun.
+4.  Scheduler unlocks dependent jobs, assigns them to Workers, or
+    completes the PipelineRun.
+
+Steps 2 to 4 occur in the same transaction.
 
 Release occurs before any dependent JobRun is queued.
 
@@ -236,11 +245,15 @@ This prevents one container from consuming the entire machine.
 
 # 11. Worker Heartbeat
 
-Workers periodically update:
+Workers periodically publish a `worker.heartbeat` event on
+`rustkins.events`. The Scheduler updates:
 
 ``` text
 last_heartbeat_at
 ```
+
+At startup, a Worker publishes `worker.registered` with its CPU and
+memory capacity. The Scheduler creates or updates the WorkerNode.
 
 If heartbeat timeout expires:
 
@@ -386,6 +399,9 @@ OutboxMessage remains pending.
 JobRun remains queued with reserved resources.
 
 Outbox Publisher retries publication later.
+
+Worker events and heartbeats are delayed; the heartbeat timeout must
+tolerate short broker outages.
 
 ------------------------------------------------------------------------
 

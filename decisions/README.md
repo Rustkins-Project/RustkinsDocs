@@ -6,6 +6,12 @@ Une ADR formalise **une décision et ses conséquences**, pas une simple découv
 - Contrat des métadonnées : [adr.schema.json](../schemas/adr.schema.json)
 - Règles complètes : [knowledge-management.md](../docs/conventions/knowledge-management.md)
 
+## Décisions
+
+| ADR | Titre | Statut |
+| --- | --- | --- |
+| [ADR-0001](ADR-0001-worker-scheduler-communication.md) | Les workers communiquent uniquement avec le Scheduler, sans accès à PostgreSQL | `proposed` |
+
 ## Gouvernance obligatoire
 
 - Toute **nouvelle ADR ou modification de décision** passe par une Pull Request.

@@ -283,6 +283,9 @@ Examples
 -   exit code
 -   timestamps
 
+Written only by the Scheduler, including from Worker events
+(`job.started`, `step.finished`, `job.finished`).
+
 `warning` is a final non-blocking status used when a job completed with
 non-blocking issues.
 
@@ -394,6 +397,10 @@ Stores
 -   status
 
 Scheduler is the only component allowed to reserve and release capacity.
+
+Created and updated by the Scheduler from `worker.registered` and
+`worker.heartbeat` events. Workers never access PostgreSQL
+([ADR-0001](../../../decisions/ADR-0001-worker-scheduler-communication.md)).
 
 ------------------------------------------------------------------------
 
