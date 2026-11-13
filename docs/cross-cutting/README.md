@@ -6,7 +6,7 @@ Ce répertoire rassemble la documentation relative à l'entreprise et aux enjeux
 | --- | --- |
 | [RGPD et protection des données](gdpr/README.md) | Gouvernance des données, analyses, livrables RGPD, comptes rendus |
 | [Modèle économique](business-model/README.md) | Offre gratuite, financement, services premium, stratégie commerciale |
-| [Direction artistique](art-direction/README.md) | Identité visuelle, marque, charte, supports graphiques |
+| [Direction artistique](art-direction/README.md) | Identité de marque, valeurs, univers visuel, principes des thèmes clair/sombre et déclinaisons sur les supports |
 | [Veille](technology-watch/README.md) | Veille technologique, réglementaire, concurrentielle et synthèses |
 | [Éco-conception](eco-design/README.md) | Empreinte du service, bonnes pratiques et indicateurs |
 | [Communication](communication/README.md) | Messages publics, canaux, campagne et supports de communication |
