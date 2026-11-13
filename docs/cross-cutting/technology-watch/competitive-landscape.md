@@ -147,7 +147,7 @@ Aucun projet Rust ne propose aujourd'hui une **plateforme CI/CD complète auto-h
 | Logs en temps réel | V1 | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ? |
 | Artifacts + rétention | V1 | ✅ | ✅ | ✅ | ✅ | 🟡 (plugins) | ✅ | ? |
 | Cache de dépendances | V2 | ✅ | 🟡 | ✅ | ✅ | 🟡 (plugins) | 🟡 | ? |
-| Cache des couches Docker | — | ✅ | 🟡 | 🟡 | 🟡 (`cache-to: type=gha`) | 🟡 | 🟡 | ? |
+| Cache des couches Docker | à fixer | ✅ | 🟡 | 🟡 | 🟡 (`cache-to: type=gha`) | 🟡 | 🟡 | ? |
 
 ### 4.5 Sécurité et organisation
 
@@ -171,7 +171,8 @@ Aucun projet Rust ne propose aujourd'hui une **plateforme CI/CD complète auto-h
 
 - **Avantages de Rustkins dès la V1** : placement selon les ressources libres du nœud et file durable avec retry, DLQ et idempotence (presque aucun concurrent ne les fait nativement), retry automatique (absent de GitHub Actions), le tout open source, auto-hébergé et sans forge imposée.
 - **Rattrapage en V2** : services, cache, secrets, matrix, `when: changed`, Kubernetes. Ces fonctions sont standard chez tous les concurrents : elles ne différencient pas, mais leur absence bloque l'adoption.
-- **Non prévus** : cache des couches Docker, détection des tests instables, découpage des tests selon leur durée. Ce sont les arguments de vente de CircleCI ; à évaluer pour la V3 (proposition, pas une décision).
+- **Cache des couches Docker** : voulu par l'équipe mais absent de la roadmap et de la spécification YAML v3 (dont le cache ne couvre que des fichiers déclarés) ; version à fixer.
+- **Non prévus** : détection des tests instables, découpage des tests selon leur durée. Ce sont les arguments de vente de CircleCI ; à évaluer pour la V3 (proposition, pas une décision).
 - **Oxide CI** est le seul projet Rust comparable (Tokio, agents via NATS, plugins natifs et Wasm), mais il reste une alpha sans offre de service.
 
 > Les cases concurrentes résument la documentation publique et des sources secondaires au 13/11/2026. Vérifier une case avant de la citer à l'extérieur, et se méfier des comparatifs publiés par les éditeurs eux-mêmes (ex. le tableau CircleCI vs GitHub Actions, qui marque ❌ des fonctions disponibles via une action officielle ou un plan payant).
