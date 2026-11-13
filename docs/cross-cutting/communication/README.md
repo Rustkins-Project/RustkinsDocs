@@ -29,6 +29,6 @@ Un **PDF de synthèse** peut être généré à partir de ces documents Markdown
 
 - [Roadmap produit](../../versions/roadmap.md) : source de vérité sur les fonctionnalités par version.
 - [Modèle économique](../business-model/business-model.md) : ne pas présenter des prix ou offres encore indéfinis comme acquis.
-- [Direction artistique](../art-direction/art-direction.md) : identité visuelle proposée ; la charte graphique détaillée n'est pas encore définie.
+- [Direction artistique](../art-direction/art-direction.md) et [charte graphique proposée](../art-direction/graphic-charter.md) : orientations visuelles, palette et principes UI ; documents au statut `draft`.
 
 Toujours distinguer fonctionnalités **disponibles**, **en développement** et **prévues**. Ne pas promettre de conformité RGPD ou de sécurité automatique par l'auto-hébergement. Avant de publier sur Reddit ou d'annoncer une participation à un salon, vérifier les règles et les dates actualisées.
