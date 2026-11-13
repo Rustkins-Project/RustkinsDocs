@@ -113,4 +113,4 @@ Aucune valeur chiffrée ou résultat d'expérimentation n'est affirmé à ce sta
 - [V0 — Récapitulatif détaillé](../../versions/v0/overview.md)
 - [V1 — Récapitulatif détaillé](../../versions/v1/overview.md)
 - [Modèle économique](../business-model/business-model.md)
-- [Structure de l'équipe et de l'entreprise envisagée](company-structure.md)
+- [Structure de l'entreprise Rustkins](company-structure.md)

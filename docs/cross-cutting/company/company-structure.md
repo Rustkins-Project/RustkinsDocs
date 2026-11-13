@@ -1,138 +1,66 @@
 ---
 id: DOC-0103
-title: "Structure de l'équipe et de l'entreprise Rustkins"
+title: "Structure de l'entreprise Rustkins"
 type: cross-cutting
 status: draft
-summary: "Organisation actuelle du projet et structure d'entreprise envisagée, sans présumer d'une société déjà constituée."
+summary: "Direction, organisation, forme juridique proposée et décisions à prendre pour la création de Rustkins."
 topics: [entrepreneurship, company, governance, organization, legal-structure]
 applies_to: [all]
 ---
 
-# Structure de l'équipe et de l'entreprise Rustkins
+# Structure de l'entreprise Rustkins
 
-> **Distinction essentielle :** ce document présente d'abord **l'organisation actuelle du projet** puis **l'organisation d'une entreprise éventuelle**. Aucun statut juridique, immatriculation, répartition de capital, titre de dirigeant ou contrat commercial n'est établi par les sources consultées.
+Rustkins est une entreprise française en création qui édite un moteur CI/CD open source et auto-hébergé. Elle vise d'abord les PME et petites équipes techniques françaises qui exploitent leur propre CI/CD, puis prévoit de développer son activité à l'international. Ses revenus proviennent du support sur abonnement, des déploiements sur l'infrastructure des clients et des développements spécifiques sur devis.
 
-## 1. Situation actuelle : une équipe projet
+## 1. Direction et organisation
 
-Rustkins est porté par **trois membres : Timothy, Alexis et Loick**. Ils conçoivent et organisent ensemble le développement du produit. La gouvernance de projet officielle prévoit des décisions collectives sur la vision, les évolutions structurantes et la validation des versions.
+**Timothy Rogier dirige Rustkins.** Il pilote la stratégie, les priorités produit et les relations commerciales. Alexis et Loick assurent avec lui le développement du moteur, les intégrations et la qualité. Les trois fondateurs définissent ensemble la feuille de route et valident les versions du produit.
 
-Les responsabilités formalisées dans la documentation concernent essentiellement le **pilotage du produit** et l'organisation du travail :
+L'équipe travaille en télétravail intégral. Au lancement, les fondateurs assurent la prospection, les démonstrations et le support. La comptabilité et la paie sont externalisées. Des prestataires spécialisés interviennent sur les contrats, le RGPD et la sécurité.
 
-| Responsabilité de projet documentée | Fonctionnement |
-| --- | --- |
-| Vision, choix structurants et validation des versions | Décisions prises collectivement par Timothy, Alexis et Loick |
-| Priorisation du Product Backlog | Pilotage par Timothy, après échanges avec l'équipe |
-| Définition des objectifs de sprint | Décision collective |
-| Coordination des modifications du Sprint Backlog | Timothy |
-| Développement, tests et documentation | Réalisation par le membre responsable de chaque tâche, avec validation selon la Definition of Done |
-| Validation finale des User Stories | Décision humaine en Sprint Review |
+## 2. Équipe et rémunérations prévues
 
-Cette répartition **ne préjuge pas des fonctions de président, gérant, associé, salarié ou responsable commercial** d'une future entreprise.
-
-## 2. Organisation opérationnelle
-
-L'équipe fonctionne de manière collaborative et principalement asynchrone, avec Azure Boards pour le backlog, GitHub pour le code et les PR, et RustkinsDocs pour la documentation et les décisions formalisées. RustkinsActivity documente les interventions ; des outils internes facilitent le partage de connaissances.
-
-```mermaid
-flowchart TD
-    E["Équipe Rustkins : Timothy, Alexis et Loick"]
-    E --> D["Décisions produit et architecture : collectives"]
-    E --> P["Priorisation du backlog : Timothy"]
-    E --> X["Réalisation : tâches réparties entre les membres"]
-    X --> Q["Tests, documentation, revue et validation"]
-```
-
-Les évolutions importantes sont décrites par des documents versionnés, revues et, pour les arbitrages d'architecture, par des ADR. Les tâches et leurs états restent suivis dans Azure Boards ; le dépôt documentaire ne remplace pas la gestion opérationnelle.
-
-## 3. Structure cible d'une activité économique
-
-Si Rustkins devient une entreprise, son activité envisagée serait celle d'un **éditeur de logiciel open source proposant des services B2B complémentaires**. Il convient de distinguer :
-
-- **Produit :** développement, publication, maintenance et sécurité de la plateforme auto-hébergée.
-- **Services :** support prioritaire optionnel, installation/configuration sur infrastructure cliente, évolutions spécifiques après devis.
-- **Relation client :** qualification du besoin, contractualisation, facturation et traitement des demandes.
-- **Fonctions support :** comptabilité, administration, conformité, assurance, propriété intellectuelle et protection des données.
-
-L'entreprise **n'aurait pas vocation, selon le modèle actuel, à héberger les instances CI/CD de ses clients en SaaS**. Elle pourrait cependant exploiter sa propre infrastructure interne pour développer, tester, documenter et présenter Rustkins.
-
-## 4. Répartition fonctionnelle proposée pour une petite structure
-
-La structure suivante est **une proposition d'organisation**, à discuter entre les trois membres avant toute formalisation. Elle décrit des fonctions à couvrir, pas des postes déjà attribués ni trois départements salariés.
-
-| Fonction | Missions envisagées | Mode d'organisation possible |
-| --- | --- | --- |
-| Direction produit | Vision, roadmap, priorités, retours utilisateurs | Coordination produit avec arbitrage collectif |
-| Ingénierie et qualité | Architecture, développement, tests, sécurité, releases | Répartition des tâches selon expertises et disponibilités |
-| Exploitation et intégration | Paquets de déploiement, documentation d'installation, interventions clientes | Référent technique désigné pour chaque prestation |
-| Commercial et relation client | Prospection, découverte des besoins, offres, support premium | Responsabilité identifiée par dossier client |
-| Gestion et conformité | Contrats, facturation, finances, propriété intellectuelle, RGPD | Responsable désigné puis recours à des conseils spécialisés si nécessaire |
-
-Le cumul de plusieurs fonctions par une même personne serait normal au lancement. L'objectif est d'éviter les angles morts : une prestation facturée doit avoir un responsable, un périmètre accepté et des conditions de maintenance explicites.
-
-### Équipe budgétée de 2027 à 2030
-
-Le [business plan](../business-model/business-plan.md) suppose trois fondateurs actifs à temps plein dès janvier 2027, en télétravail intégral. Les montants ci-dessous correspondent au brut annuel équivalent temps plein au démarrage de chaque rémunération.
+Le [business plan](../business-model/business-plan.md) prévoit trois fondateurs actifs à temps plein à partir de janvier 2027. Les montants indiqués correspondent à un brut annuel équivalent temps plein au démarrage de chaque rémunération.
 
 | Rôle | Début de la rémunération | Brut annuel | Répartition ou missions |
 | --- | --- | ---: | --- |
-| Timothy | Janvier 2027 | 36 000 € | 40 % développement et 60 % direction produit, pilotage, vente et communication |
-| Alexis | Juillet 2028 | 36 000 € | 80 % développement et 20 % tâches transverses, dont coordination et suivi client |
-| Loick | Juillet 2028 | 36 000 € | 80 % développement et 20 % tâches transverses, dont coordination et suivi client |
+| Timothy Rogier · Direction | Janvier 2027 | 36 000 € | 40 % développement et 60 % direction produit, pilotage, vente et communication |
+| Alexis · Développement et intégration | Juillet 2028 | 36 000 € | 80 % développement et 20 % coordination, documentation et suivi client |
+| Loick · Développement et qualité | Juillet 2028 | 36 000 € | 80 % développement et 20 % coordination, documentation et suivi client |
 | Commercial et communication | Juillet 2029 | 40 000 € | Prospection, démonstrations, suivi des devis et animation des canaux |
 | Support technique et intégration | Juillet 2030 | 44 000 € | Traitement des demandes, déploiements et accompagnement technique |
 
-Alexis et Loick sont budgétés sans rémunération pendant les dix-huit premiers mois. Leurs droits éventuels à l'ARE sont à confirmer individuellement. Le prévisionnel majore le brut de 42 % pour estimer le coût employeur. La comptabilité et la paie sont externalisées, avec des interventions spécialisées pour les contrats, le RGPD et la sécurité.
+Alexis et Loick sont budgétés sans rémunération pendant les dix-huit premiers mois. Leurs droits éventuels à l'ARE sont à vérifier individuellement. Le prévisionnel majore le brut de 42 % pour estimer le coût employeur.
 
-## 5. Forme juridique et gouvernance capitalistique : non décidées
+## 3. Forme juridique proposée
 
-À ce stade, les sources du projet **ne précisent pas** :
+La forme proposée pour la création de Rustkins est la **société par actions simplifiée (SAS)**, avec les trois fondateurs comme associés et **Timothy Rogier comme président**. Le président représente la société et les statuts fixent ses pouvoirs ainsi que les décisions qui relèvent des associés. Cette souplesse permet d'organiser la direction quotidienne, les décisions collectives et l'entrée éventuelle de nouveaux associés. [Service Public Entreprendre — Société par actions simplifiée](https://entreprendre.service-public.gouv.fr/vosdroits/F37366)
 
-- si une société est déjà immatriculée ;
-- le pays d'établissement juridique retenu ;
-- la forme sociale, les mandataires sociaux ou les statuts ;
-- la répartition des parts ou actions, les apports et la propriété des actifs ;
-- les contrats entre fondateurs, contributeurs et éventuels clients.
+Les statuts devront préciser les règles de vote, les pouvoirs de signature et les conditions de cession des actions. Les fondateurs peuvent également prévoir un pacte d'associés pour organiser leurs engagements réciproques et les modalités de départ.
 
-Le dossier entrepreneurial retient une **SAS en France** comme hypothèse de chiffrage. Le choix de la forme sociale et le statut des fondateurs restent à valider après examen juridique, fiscal et social.
+## 4. Décisions à préparer
 
-Les sujets à arbitrer incluent les pouvoirs de décision, les entrées/sorties d'associés, le financement, la rémunération, la gestion d'un désaccord et le sort du code développé avant la création de l'entité.
+### Capital et propriété intellectuelle
 
-## 6. Ressources et partenaires clés
+Le prévisionnel retient **50 000 € d'apport au capital**. Il faut décider combien chacun apporte, comment les actions sont réparties et quels droits de vote s'y attachent. La présidence, le pourcentage du capital et les droits de vote sont trois décisions distinctes. Les fondateurs doivent aussi prévoir comment un associé pourra céder ses actions ou quitter l'entreprise.
 
-**Ressources existantes dans la documentation :** travail des trois membres, dépôts GitHub, documentation technique et processus Agile. Les outils internes (RustkinsMCP, RustkinsActivity, RustkinsSkills et DiscordBot) soutiennent le travail de l'équipe, mais **ne constituent pas le produit CI/CD vendu aux clients**.
+Pour le code, la documentation, le nom et le logo Rustkins, il faut identifier les auteurs et titulaires des droits, puis décider quels droits la société doit détenir ou pouvoir exercer. Cela concerne notamment le code écrit avant la création et les contributions externes. Une cession ou une licence peut formaliser les droits nécessaires. Il faut aussi fixer la licence de distribution du logiciel et décider au nom de qui déposer la marque.
 
-**Ressources à prévoir pour une activité commerciale :** capacité de support, documentation d'installation, démonstrations, environnements de test, gestion des contacts et des devis, suivi du temps d'intervention, outils de facturation et accompagnement juridique/comptable selon les besoins.
+### Ressources humaines
 
-Les éventuels partenaires d'hébergement, distributeurs, revendeurs ou intégrateurs restent **des pistes de développement**, pas des accords établis.
+La question porte sur le temps que l'équipe peut réellement consacrer au produit et aux clients. Il faut estimer la charge du support à partir des pilotes, réserver du temps pour les déploiements et les développements sur devis, puis désigner qui couvre les demandes pendant les absences. Le prévisionnel ne laisse qu'environ neuf jours de marge technique en 2030 après la charge client et le temps réservé au produit. Ce chiffre permet de discuter du moment où le renfort support devient nécessaire.
 
-## 7. Principaux processus d'une entreprise future
+### Cadre contractuel
 
-1. **Conception :** collecte des retours, qualification du besoin, arbitrage de la roadmap.
-2. **Production :** développement, tests, revues, publication de versions et documentation.
-3. **Distribution :** mise à disposition du logiciel et des instructions d'auto-hébergement.
-4. **Vente de services :** expression du besoin, devis et périmètre contractualisé.
-5. **Exécution :** installation chez le client ou réalisation de l'évolution convenue, avec critères de réception.
-6. **Support :** suivi des demandes selon l'offre effectivement souscrite, sans promettre de SLA non définis.
-7. **Amélioration :** analyse du retour d'expérience et ajustement de l'offre.
+Pour chaque pack, préciser les horaires, le canal de contact, le nombre de demandes, les règles de priorité et les éventuels délais de première réponse. Pour un déploiement ou un développement sur devis, définir les prérequis, les accès à l'infrastructure cliente, les livrables, la réception et la maintenance éventuelle. Il faut aussi déterminer qui gère les incidents après la livraison et fixer la répartition des responsabilités dans les contrats.
 
-## 8. Points à valider avant de finaliser ce volet
+### Charges prévisionnelles
 
-| Sujet | Question de décision |
-| --- | --- |
-| Existence juridique | Présente-t-on Rustkins comme un projet en pré-création ou comme une société effectivement constituée ? |
-| Implantation et statut | Où et sous quelle forme l'activité serait-elle portée ? |
-| Gouvernance de l'entreprise | Qui représente légalement la structure ? Comment sont décidés les engagements commerciaux ? |
-| Capital et propriété intellectuelle | Quels apports, quelle répartition et quels droits sur le code et la marque ? |
-| Ressources humaines | Quelles disponibilités réelles pour le développement et le support payant ? |
-| Cadre contractuel | Quelles conditions de support, d'installation, de responsabilité et de maintenance ? |
-| Charges prévisionnelles | Quels coûts fixes, variables et objectifs de trésorerie, une fois les hypothèses vérifiées ? |
+Identifier les dépenses récurrentes, comme les rémunérations, la comptabilité et les outils, puis les coûts qui varient avec le nombre de clients ou de missions, comme les déplacements et le temps de support. Les devis des prestataires et la charge mesurée sur les pilotes permettront d'affiner le budget. Le suivi mensuel doit intégrer le délai de règlement des clients, les échéances du prêt et la réserve cible de **20 000 €**. Le [business plan](../business-model/business-plan.md) chiffre aussi l'effet d'une baisse des encaissements sur cette réserve.
 
-Ces questions sont à traiter **avant toute affirmation sur l'existence, la composition juridique ou la solidité financière d'une entreprise Rustkins**.
+## 5. Références
 
-## 9. Références internes
-
-- [Principes et gouvernance du projet](../../project-management/principles-and-governance.md)
-- [Documentation et sources de vérité](../../conventions/knowledge-management.md)
 - [Présentation du projet](project-presentation.md)
-- [Modèle économique de référence](../business-model/business-model.md)
+- [Modèle économique](../business-model/business-model.md)
+- [Business plan 2027–2030](../business-model/business-plan.md)
 - [Compte rendu du point RGPD du 9 novembre 2026](../gdpr/meeting-notes/2026-11-09-rgpd-meeting.md)

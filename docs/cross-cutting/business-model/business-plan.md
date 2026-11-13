@@ -10,7 +10,9 @@ applies_to: [all]
 
 # Business plan Rustkins 2027–2030
 
-Ce scénario de présentation suppose la création d'une SAS en France et une montée en charge commerciale auprès des PME et petites équipes techniques françaises qui auto-hébergent leur CI/CD. Les volumes, prix et modalités de financement sont des hypothèses. Le détail des calculs figure dans le classeur `Rustkins_Business_Plan_2027-2030`, onglets Synthèse, Hypothèses, Ventes, Équipe et charges, et Trésorerie.
+Ce scénario de présentation suppose la création d'une SAS en France et une montée en charge commerciale auprès des PME et petites équipes techniques françaises qui auto-hébergent leur CI/CD. La France est le premier marché visé. Le développement international constitue l'étape suivante. Les volumes, prix et modalités de financement sont des hypothèses.
+
+[Consulter le prévisionnel détaillé dans Google Sheets](https://docs.google.com/spreadsheets/d/1TWrKskhzDX_CuDX2yC4a-god38dyIWJd-hYuvmMCvqE/edit?usp=sharing)
 
 ## Lancement et chiffre d'affaires
 

@@ -5,7 +5,7 @@ Point d'entrée du **livrable global de la semaine entrepreneuriale**. Chaque pa
 ## Parties en cours de rédaction
 
 1. **Présentation du projet :** [Rustkins — vision, besoins, produit et trajectoire](../company/project-presentation.md)
-2. **Structure de l'entreprise :** [équipe actuelle et organisation future envisagée](../company/company-structure.md)
+2. **Structure de l'entreprise :** [direction, organisation et forme juridique proposée](../company/company-structure.md)
 3. **Modèle économique :** [Business Model Canvas](../business-model/business-model-canvas.md), [modèle économique détaillé](../business-model/business-model.md) et [business plan 2027–2030](../business-model/business-plan.md)
 
 ## Parties à compléter ultérieurement

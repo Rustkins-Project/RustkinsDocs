@@ -41,7 +41,7 @@ Attention : **version de spécification YAML ≠ version du produit**.
 
 - [Dossier entrepreneurial — plan du livrable](docs/cross-cutting/entrepreneurial-report/README.md)
 - [Présentation de Rustkins](docs/cross-cutting/company/project-presentation.md)
-- [Structure de l'équipe et de l'entreprise envisagée](docs/cross-cutting/company/company-structure.md)
+- [Structure de l'entreprise Rustkins](docs/cross-cutting/company/company-structure.md)
 - [Business Model Canvas](docs/cross-cutting/business-model/business-model-canvas.md)
 - [Business plan Rustkins 2027–2030](docs/cross-cutting/business-model/business-plan.md)
 - [Index des domaines transversaux](docs/cross-cutting/README.md)
