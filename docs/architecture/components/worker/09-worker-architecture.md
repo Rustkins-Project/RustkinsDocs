@@ -367,3 +367,6 @@ Candidates
 -   Sandboxed execution
 -   Multiple execution backends
 -   Remote execution
+-   Per-job resource usage collection (CPU time, peak memory, image
+    pull time, OOM kills), see the
+    [eco-design approach](../../../cross-cutting/eco-design/eco-design-approach.md)

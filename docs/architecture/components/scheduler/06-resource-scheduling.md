@@ -459,3 +459,12 @@ Candidates
 -   Load balancing
 -   GPU resources
 -   Dynamic worker capacity
+-   Reserved vs actual resource usage per job, with sizing suggestions
+-   Worker `draining` state (finish running jobs, accept no new ones)
+-   Time-based capacity profiles (workers accepting jobs per time slot)
+-   Capacity signals for external autoscalers (sustained
+    `waiting_resources`, idle workers)
+
+Any load balancing strategy must keep the ability to consolidate jobs
+on a subset of workers, so that idle workers can be stopped. See the
+[eco-design approach](../../../cross-cutting/eco-design/eco-design-approach.md).
