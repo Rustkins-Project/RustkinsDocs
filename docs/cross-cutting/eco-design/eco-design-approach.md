@@ -122,7 +122,7 @@ Le cache déclaratif de YAML v3 ([§23](../../specifications/pipeline/yaml-v3.md
 ### 3.7 Stockage : des options, des valeurs par défaut raisonnables
 
 - **Artefacts** : rétention de 30 jours par défaut, plafond par projet et nettoyage automatique déjà spécifiés ([ARCH-04 §9](../../architecture/components/storage/04-artifacts.md#9-retention)).
-- **Logs** : rétention de 60 jours par défaut, avec suppression quotidienne des objets RustFS expirés et conservation des métadonnées ([V0 §18](../../versions/v0/overview.md#18-rétention-des-logs), [V1 §18.1](../../versions/v1/overview.md#181-logs)). Reste à la rendre configurable par l'administrateur ; l'évolution est prévue dans [ARCH-03 §15](../../architecture/components/logging/03-real-time-logs.md#15-future-evolution).
+- **Logs** : rétention de 60 jours par défaut, avec suppression quotidienne des objets RustFS expirés et conservation des métadonnées ([V1 §18.1](../../versions/v1/overview.md#181-logs)). Reste à la rendre configurable par l'administrateur ; l'évolution est prévue dans [ARCH-03 §15](../../architecture/components/logging/03-real-time-logs.md#15-future-evolution).
 - **Compression** des logs archivés (piste) : les logs texte se compressent très bien.
 
 ### 3.8 Recommandations sur les pipelines

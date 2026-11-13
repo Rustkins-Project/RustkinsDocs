@@ -6,7 +6,6 @@ status: draft
 summary: "Périmètre et fonctionnement de Rustkins V0 : moteur CI local, DAG, exécution Docker, persistance et interface."
 topics: [V0, pipeline, docker, runtime]
 applies_to: [V0]
-related_adrs: [ADR-0001]
 ---
 
 # Rustkins — Récapitulatif détaillé V0
@@ -134,8 +133,7 @@ La V0 doit rester volontairement limitée. L'objectif n'est pas encore de faire 
 | Queue | RabbitMQ |
 | Stockage logs | RustFS |
 | Exécution jobs | Docker Engine local |
-| Worker | Conteneur avec accès au Docker socket, sans accès à PostgreSQL ([ADR-0001](../../../decisions/ADR-0001-worker-scheduler-communication.md)) |
-| Communication Scheduler ↔ Worker | RabbitMQ uniquement : ordres d'exécution d'un côté, événements de l'autre |
+| Worker | Conteneur avec accès au Docker socket |
 | Logs | Conservés 2 mois |
 | RabbitMQ Management | Exposé temporairement en V0 |
 | RustFS Console | Optionnelle, exposée seulement admin/dev |
@@ -161,8 +159,7 @@ flowchart TD
   Scheduler[Scheduler] --> PG
   Scheduler --> MQ
 
-  Worker[Worker container] -->|événements| MQ
-  MQ -->|JobRunRequested| Worker
+  Worker[Worker container] --> MQ
   Worker --> FS
   Worker --> Git
   Worker --> DockerSocket[/Docker socket/]
@@ -238,7 +235,7 @@ flowchart TD
     Scheduler --> MQ
 
     Worker --> MQ
-    Worker --> FS
+      Worker --> FS
     Worker --> DockerSock[/var/run/docker.sock/]
 
     PG --> PGVolume
@@ -297,6 +294,7 @@ rustkins-private
 ├── ui
 ├── api
 ├── scheduler
+├── worker
 ├── postgres
 ├── rabbitmq
 └── rustfs
@@ -307,17 +305,6 @@ Traefik est connecté aux deux réseaux :
 ```txt
 public  → reçoit les requêtes utilisateur
 private → route vers UI/API
-```
-
-### 7.3 Réseau worker
-
-Le worker n'accède pas à PostgreSQL ([ADR-0001](../../../decisions/ADR-0001-worker-scheduler-communication.md)). Il est isolé sur un réseau dédié :
-
-```txt
-rustkins-worker
-├── worker
-├── rabbitmq
-└── rustfs
 ```
 
 ---
@@ -411,10 +398,7 @@ Le Scheduler écrit :
 
 - les jobs prêts en statut `queued` ;
 - les runs en statut `running`, `success` ou `failed` ;
-- les jobs dépendants en `skipped` en cas de fail-fast ;
-- les états remontés par le Worker (`running`, statut final, steps, clé du log).
-
-Le Scheduler est le **seul composant qui écrit l'état d'exécution**.
+- les jobs dépendants en `skipped` en cas de fail-fast.
 
 ---
 
@@ -422,22 +406,10 @@ Le Scheduler est le **seul composant qui écrit l'état d'exécution**.
 
 Quand un job est prêt, le Scheduler publie un message `JobRunRequested`.
 
-C'est un **ordre d'exécution autonome** : le Worker y trouve tout ce dont il a besoin, sans lire la base.
-
 ```json
 {
   "run_id": "uuid",
-  "job_run_id": "uuid",
-  "attempt": 1,
-  "repository": { "url": "https://github.com/org/repo.git", "commit_sha": "sha" },
-  "job": {
-    "name": "build",
-    "image": "node:22",
-    "steps": [
-      { "index": 0, "run": "npm install" },
-      { "index": 1, "run": "npm run build" }
-    ]
-  }
+  "job_run_id": "uuid"
 }
 ```
 
@@ -445,30 +417,23 @@ C'est un **ordre d'exécution autonome** : le Worker y trouve tout ce dont il a 
 
 ### 9.6 Worker → RabbitMQ
 
-Le Worker consomme les messages `JobRunRequested` et publie ses événements à destination du Scheduler.
+Le Worker consomme les messages `JobRunRequested`.
 
 Règles V0 recommandées :
 
 ```txt
 - queue durable
 - messages persistants
-- ack manuel, après publication confirmée de job.finished
+- ack manuel
 - retry limité
 - dead-letter queue pour erreurs techniques
 ```
 
 ---
 
-### 9.7 Worker → Scheduler (événements)
+### 9.7 Worker → Scheduler
 
-Le Worker **n'accède pas à PostgreSQL** ([ADR-0001](../../../decisions/ADR-0001-worker-scheduler-communication.md)). Il publie des événements sur RabbitMQ, que le Scheduler valide puis écrit en base :
-
-- `job.started` : le job passe `running`, avec `started_at` ;
-- `step.finished` : statut et code de retour du step ;
-- `job.finished` : statut final, code de retour, `finished_at`, référence du fichier de logs dans RustFS ;
-- `worker.heartbeat` : le worker est vivant.
-
-Le Scheduler répond à `job.finished` en publiant les jobs suivants.
+Le Worker n'accède pas à PostgreSQL ([ADR-0001](../../../decisions/ADR-0001-worker-scheduler-communication.md)). Il signale au Scheduler, via RabbitMQ, le début et la fin de chaque job. Le Scheduler écrit les statuts, les codes de retour et la référence du fichier de logs, puis publie les jobs suivants.
 
 ---
 
@@ -828,32 +793,26 @@ sequenceDiagram
   Scheduler->>MQ: Publie JobRunRequested(build)
 
   Worker->>MQ: Consomme JobRunRequested(build)
-  Worker->>MQ: Publie job.started(build)
-  MQ->>Scheduler: job.started(build)
-  Scheduler->>PG: Marque build running
+  Worker->>MQ: Signale build démarré
   Worker->>Git: Clone repo au SHA
   Worker->>Docker: Pull image node:22
   Worker->>Docker: Create/start container
   Docker->>Job: Exécute npm install puis npm run build
   Worker->>FS: Écrit logs build
-  Worker->>MQ: Publie job.finished(build, success/failed)
+  Worker->>MQ: Signale build terminé
   Worker->>MQ: Ack message
 
-  MQ->>Scheduler: job.finished(build)
   Scheduler->>PG: Marque build success/failed
   Scheduler->>PG: Détecte test prêt si build success
   Scheduler->>PG: Marque test queued
   Scheduler->>MQ: Publie JobRunRequested(test)
 
   Worker->>MQ: Consomme JobRunRequested(test)
-  Worker->>MQ: Publie job.started(test)
-  MQ->>Scheduler: job.started(test)
-  Scheduler->>PG: Marque test running
+  Worker->>MQ: Signale test démarré
   Worker->>Docker: Create/start container
   Docker->>Job: Exécute npm test
   Worker->>FS: Écrit logs test
-  Worker->>MQ: Publie job.finished(test)
-  MQ->>Scheduler: job.finished(test)
+  Worker->>MQ: Signale test terminé
   Scheduler->>PG: Marque test success/failed
 
   Scheduler->>PG: Calcule statut final du run
@@ -952,7 +911,6 @@ services:
   worker:
     image: rustkins/worker:dev
     environment:
-      # Pas de DATABASE_URL : le worker n'accède pas à PostgreSQL (ADR-0001).
       RABBITMQ_URL: amqp://rustkins:rustkins@rabbitmq:5672
       RUSTFS_ENDPOINT: http://rustfs:9000
       RUSTFS_ACCESS_KEY: rustkins
@@ -965,7 +923,7 @@ services:
       - rabbitmq
       - rustfs
     networks:
-      - rustkins-worker
+      - rustkins-private
 
   postgres:
     image: postgres:16
@@ -989,7 +947,6 @@ services:
       - rabbitmq_data:/var/lib/rabbitmq
     networks:
       - rustkins-private
-      - rustkins-worker
 
   rustfs:
     image: rustfs/rustfs:latest
@@ -1003,7 +960,6 @@ services:
       - rustfs_data:/data
     networks:
       - rustkins-private
-      - rustkins-worker
 
 volumes:
   postgres_data:
@@ -1014,7 +970,6 @@ volumes:
 networks:
   rustkins-public:
   rustkins-private:
-  rustkins-worker:
 ```
 
 ---
@@ -1118,7 +1073,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - worker_workdir:/workdir
     networks:
-      - workers
+      - private
     deploy:
       replicas: 1
       placement:
@@ -1155,7 +1110,6 @@ services:
       - rabbitmq_data:/var/lib/rabbitmq
     networks:
       - private
-      - workers
     deploy:
       replicas: 1
       placement:
@@ -1177,7 +1131,6 @@ services:
       - rustfs_data:/data
     networks:
       - private
-      - workers
     deploy:
       replicas: 1
       placement:
@@ -1194,8 +1147,6 @@ networks:
   public:
     driver: overlay
   private:
-    driver: overlay
-  workers:
     driver: overlay
 ```
 
@@ -1391,7 +1342,7 @@ La V0 est considérée comme validée si :
 6. Un run est créé en base.
 7. Les jobs et steps sont créés en base.
 8. Le Worker clone le dépôt au SHA demandé.
-9. Le Worker lance un conteneur Docker par job, sans accès à PostgreSQL ; le Scheduler écrit les états qu'il remonte.
+9. Le Worker lance un conteneur Docker par job.
 10. Les steps sont exécutés dans l'ordre.
 11. Les codes de retour sont capturés.
 12. Les logs sont stockés dans RustFS.
