@@ -89,7 +89,8 @@ Les décisions s'appuient sur les bons signaux :
 | --- | --- | --- |
 | Jobs en `waiting_resources` avec un temps d'attente qui augmente | Capacité réellement insuffisante | Ajouter un worker ou de la puissance sur la plage concernée |
 | Worker réservé à 100 % mais consommation réelle faible | Ressources surdéclarées, pas un manque de capacité | Corriger le dimensionnement des jobs (§3.1), **pas** ajouter de worker |
-| Worker réservé à 100 % en permanence, sans file d'attente | Utilisation efficace | Rien à faire |
+| Worker réservé à 100 % en permanence, sans file d'attente ni erreur anormale | Utilisation efficace | Rien à faire |
+| Worker souvent saturé en consommation **réelle** (CPU ou mémoire) et erreurs aléatoires (timeouts, tests instables, arrêts pour manque de mémoire) sur les jobs qu'il exécute | Contention : les jobs se gênent sur la machine | Donner plus de marge à ce worker (réduire la capacité déclarée ou ajouter de la puissance), après avoir vérifié que les mêmes jobs passent ailleurs |
 | Worker inactif sur une plage récurrente | Surcapacité | Le passer en `draining` puis l'arrêter sur cette plage |
 
 Un worker plein en permanence n'est pas un problème en soi : c'est le **temps d'attente des jobs** qui justifie d'ajouter de la capacité.
@@ -103,12 +104,19 @@ Piste : un déclencheur planifié (`schedule`, expression cron) pour les tâches
 ### 3.5 Ne pas exécuter ce qui est inutile
 
 - **Annulation manuelle** : indispensable, déjà prévue ([ARCH-09 §12](../../architecture/components/worker/09-worker-architecture.md#12-cancellation)). L'utilisateur reste responsable de ce qu'il annule.
-- **Annulation automatique d'un run remplacé** (piste) : quand un nouveau push arrive sur la même branche, annuler le run précédent devenu obsolète, comme l'option `concurrency` de GitHub Actions. Option **désactivée par défaut**, activable par pipeline.
+- **Annulation automatique d'un run remplacé** (piste) : quand un nouveau run démarre avec la même **clé de concurrence** (par exemple la branche), annuler le run précédent devenu obsolète. Utile surtout pour les pipelines longs (compilation ou tests de plusieurs dizaines de minutes) dont seul le dernier résultat compte. Option **désactivée par défaut**, configurable par pipeline ou par job. Exemple de syntaxe à arbitrer :
+
+  ```yaml
+  concurrency:
+    key: branch             # clé unique : branche, tag, environnement…
+    mode: cancel-previous   # ou queue (attendre la fin du run en cours)
+    scope: pipeline         # ou job : n'annuler que le même job
+  ```
 - **Filtres de chemins** (piste) : ne déclencher un pipeline que si certains fichiers ont changé. YAML v3 filtre les branches et les tags, pas les chemins.
 
 ### 3.6 Réutiliser plutôt que recalculer : le cache
 
-Le cache déclaratif de YAML v3 ([§23](../../specifications/pipeline/yaml-v3.md#23-cache)) évite de retélécharger et recompiler les dépendances. Sa clé basée sur le hash des fichiers verrous règle la question de l'invalidation. En revanche, la spécification **ne définit ni durée d'expiration ni taille maximale** : sans elles, le stockage du cache croît sans limite. À ajouter : expiration après N jours sans utilisation et quota par projet, configurables.
+Le cache déclaratif de YAML v3 ([§23](../../specifications/pipeline/yaml-v3.md#23-cache)) évite de retélécharger et recompiler les dépendances. Sa clé basée sur le hash des fichiers verrous règle la question de l'invalidation. La spécification du cache n'est pas terminée : elle **ne définit pas encore de durée d'expiration ni de taille maximale**, sans lesquelles le stockage du cache croît sans limite. Proposition : expiration par défaut **7 jours sans utilisation**, et quota par projet, tous deux configurables.
 
 ### 3.7 Stockage : des options, des valeurs par défaut raisonnables
 
@@ -118,14 +126,16 @@ Le cache déclaratif de YAML v3 ([§23](../../specifications/pipeline/yaml-v3.md
 
 ### 3.8 Recommandations sur les pipelines
 
+L'objectif est de **sensibiliser** : beaucoup d'utilisateurs prennent l'image qu'ils savent fonctionner (souvent Ubuntu) parce qu'ils ne connaissent pas les alternatives. Souvent, il suffit de connaître l'information pour faire mieux. Le parcours classique est : Ubuntu → Debian `-slim` → Alpine → `distroless` ou `scratch`.
+
 À partir des métriques (§4), l'interface peut afficher des **suggestions**, jamais des blocages :
 
-- image lourde dont le téléchargement domine la durée du job : proposer une variante `-slim` ou une image plus légère ;
+- image lourde dont le téléchargement domine la durée du job : faire connaître les variantes plus légères (`-slim`, Alpine) ;
 - `scratch` ou `distroless` pour les images finales contenant un binaire statique ;
 - dépendances retéléchargées à chaque run : proposer le cache ;
 - ressources déclarées très supérieures à la consommation : proposer un dimensionnement (§3.1).
 
-Les recommandations doivent s'appuyer sur la **mesure**, pas sur une règle fixe. Par exemple, Alpine utilise musl : certaines dépendances natives (paquets Python, modules Node) n'y ont pas de binaires précompilés et se recompilent à chaque build. Le job consomme alors **plus** de CPU qu'avec une image Debian `-slim`, malgré une image plus petite.
+Chaque suggestion indique ses limites, pour que l'utilisateur choisisse en connaissance de cause. Par exemple, Alpine utilise musl : certaines dépendances natives (paquets Python, modules Node) n'y ont pas de binaires précompilés et se recompilent à chaque build. Le job consomme alors **plus** de CPU qu'avec une image Debian `-slim`, malgré une image plus petite.
 
 ### 3.9 Interfaces web
 
@@ -149,11 +159,15 @@ Ces métriques servent d'abord à l'exploitation (dimensionnement, débogage) ; 
 
 ### 5.1 RabbitMQ
 
-L'équipe a identifié que RabbitMQ est probablement **surdimensionné** pour les besoins de la V1 : un service de plus à installer, à superviser et à faire tourner en permanence, ce qui pèse surtout sur les petites installations.
+L'équipe a identifié que RabbitMQ est probablement **surdimensionné** pour les besoins de la V1 : un service de plus à installer, à superviser et à faire tourner en permanence, ce qui pèse surtout sur les petites installations. Il a été retenu comme solution connue de l'équipe, et pour une raison de **sécurité** : isoler les workers de la base de données.
 
-Constat dans la documentation : PostgreSQL est déjà la source de vérité et alimente RabbitMQ par une outbox transactionnelle ([ARCH-02](../../architecture/components/messaging/02-rabbitmq-architecture.md)). Une file de jobs dans PostgreSQL (`SELECT … FOR UPDATE SKIP LOCKED`) et des notifications `LISTEN/NOTIFY` couvriraient une partie des usages. Le transport des logs en temps réel vers plusieurs lecteurs est le cas où un broker apporte le plus.
+Constats dans la documentation :
 
-**Orientation :** conserver RabbitMQ pour sortir la V1, l'architecture étant déjà conçue autour. Isoler l'accès au broker derrière une interface (trait Rust) pour qu'un remplacement ultérieur reste localisé. Mesurer l'empreinte du broker sur l'installation de référence. Toute décision de remplacement passe par une ADR.
+- PostgreSQL est déjà la source de vérité et alimente RabbitMQ par une outbox transactionnelle ([ARCH-02](../../architecture/components/messaging/02-rabbitmq-architecture.md)). Une file de jobs dans PostgreSQL (`SELECT … FOR UPDATE SKIP LOCKED`) et des notifications `LISTEN/NOTIFY` couvriraient une partie des usages. Le transport des logs en temps réel vers plusieurs lecteurs est le cas où un broker apporte le plus.
+- **Contradiction à arbitrer :** l'architecture actuelle fait accéder les workers **directement à PostgreSQL** (chargement et mise à jour du JobRun, [ARCH-09 §3 et §5](../../architecture/components/worker/09-worker-architecture.md#5-job-processing-sequence), mêmes flèches dans ARCH-01, ARCH-02 et ARCH-06). L'isolation recherchée n'est donc pas obtenue aujourd'hui : un worker compromis par un job malveillant détiendrait des identifiants de base de données.
+- L'isolation ne dépend pas du broker : elle s'obtient dès que les workers **ne détiennent aucun identifiant PostgreSQL** et passent par un intermédiaire qui valide leurs messages (RabbitMQ consommé par le scheduler, ou une API interne dédiée aux workers).
+
+**Orientation :** conserver RabbitMQ pour sortir la V1, l'architecture étant déjà conçue autour. Isoler l'accès au broker derrière une interface (trait Rust) pour qu'un remplacement ultérieur reste localisé. Mesurer l'empreinte du broker sur l'installation de référence. Corriger l'accès direct des workers à PostgreSQL, ou le justifier, dans une ADR. Toute décision de remplacement du broker passe aussi par une ADR.
 
 ### 5.2 Autres compromis
 
@@ -166,9 +180,9 @@ Constat dans la documentation : PostgreSQL est déjà la source de vérité et a
 
 ## 6. Communication
 
-- Les arguments recevables sont **vérifiables** : orchestrateur écrit en Rust (pas de machine virtuelle Java, pas de ramasse-miettes), réservation de ressources par job, consolidation, métriques de consommation visibles, valeurs par défaut sobres.
-- Ne pas affirmer que Rustkins « consomme moins que Jenkins » sans mesure comparative publiée. Jenkins sait aussi provisionner des agents à la demande (plugins Kubernetes, EC2) : le gaspillage d'agents allumés en permanence vient d'une configuration courante, pas d'une impossibilité. L'argument juste est que **Rustkins rend la configuration sobre simple et visible par défaut**. Cela rejoint la règle de [positionnement](../communication/positioning-and-messages.md) sur la comparaison avec Jenkins.
-- Le langage Rust réduit l'empreinte de l'orchestrateur, pas celle des jobs, qui domine le total. Ne pas en faire un argument chiffré.
+- Les arguments de performance portent sur la **conception**, pas sur la vitesse brute : **provisionnement intelligent** (réservation par job, consolidation, signaux de capacité), **cache intégré**, **sobriété par défaut** (rétentions, limites, suggestions) et **métriques de consommation visibles**.
+- Face à Jenkins : Jenkins sait provisionner des agents à la demande (plugins Kubernetes, EC2), mais ce n'est ni mis en avant ni le comportement par défaut, et sa configuration laisse passer des installations très gaspilleuses (agents allumés en permanence et mal répartis). L'argument juste est que **Rustkins rend la configuration sobre simple et visible par défaut**. Ne pas affirmer qu'il « consomme moins que Jenkins » sans mesure comparative publiée, conformément à la règle de [positionnement](../communication/positioning-and-messages.md).
+- Rust allège l'orchestrateur lui-même (pas de machine virtuelle Java, pas de ramasse-miettes, faible empreinte mémoire). En revanche, il ne change rien à la consommation des jobs (compilations, tests), qui représente l'essentiel du total quel que soit l'orchestrateur. C'est un argument valable, pas un argument chiffré.
 - Pas d'allégation générique (« CI verte », « éco-responsable ») : la directive (UE) 2024/825 interdit les allégations environnementales génériques non étayées.
 
 ## 7. Lacunes de la documentation à combler
@@ -177,11 +191,12 @@ Constat dans la documentation : PostgreSQL est déjà la source de vérité et a
 | --- | --- | --- |
 | Collecte et exposition des métriques de consommation par job et par worker | Nouvelle spécification, ARCH-06, ARCH-09 | Haute : prérequis des autres leviers |
 | Comparaison ressources réservées / consommées et suggestion de dimensionnement | ARCH-06 | Haute |
+| Accès direct des workers à PostgreSQL, contraire à l'isolation recherchée (§5.1) | ARCH-01, ARCH-02, ARCH-06, ARCH-09, ADR | Haute : sécurité |
 | Rétention des logs (option et valeur par défaut) | ARCH-03 | Moyenne |
-| Expiration et quota du cache | YAML v3 §23 | Moyenne |
+| Expiration (7 jours proposés) et quota du cache | YAML v3 §23 | Moyenne |
 | État `draining` des workers et profils de capacité horaires | ARCH-06, ARCH-09 | Moyenne |
 | Déclencheur planifié `schedule` (cron) | Spécification YAML future | Moyenne |
-| Annulation automatique des runs remplacés, filtres de chemins | Spécification YAML future | Basse |
+| Annulation automatique des runs remplacés (`concurrency`), filtres de chemins | Spécification YAML future | Basse |
 | ADR sur le maintien ou le remplacement de RabbitMQ | `decisions/` | Après la V1 |
 
 Ces éléments sont des **propositions** : leur version cible et leur priorité s'arbitrent dans le backlog Azure Boards.
