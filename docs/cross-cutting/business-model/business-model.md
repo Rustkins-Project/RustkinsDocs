@@ -145,7 +145,7 @@ Les étapes commerciales, la facturation et la vérification de l'abonnement res
 2. **Déploiements payants ponctuels** : installation et configuration de Rustkins **sur l'infrastructure du client**, sans hébergement SaaS.
 3. **Développements majeurs sur devis** : facturation additionnelle possible pour une fonctionnalité importante demandée par un client (ex. intégration Azure DevOps), même s'il possède un abonnement premium.
 
-Ces prestations rémunèrent des services ou un travail de développement : elles ne rendent pas payant le logiciel de base. Aucun prix, périodicité de facturation, volume de clients, chiffre d'affaires ni objectif de rentabilité n'a été fixé. Ne pas produire de projections financières présentées comme acquises sur cette base.
+Le logiciel de base reste gratuit. Le [business plan 2027–2030](business-plan.md) chiffre une hypothèse de prix, de facturation, de volumes et de rentabilité pour ces trois sources de revenus. Les tarifs commerciaux et les conditions de vente restent à valider.
 
 ### 8.2. Principaux postes de coût à prévoir
 

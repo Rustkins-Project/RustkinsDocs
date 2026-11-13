@@ -39,6 +39,8 @@ Ce besoin est une **hypothèse de marché à valider** auprès de futurs utilisa
 
 Il s'agit de **segments à tester**, non de clients acquis ou d'engagements commerciaux déjà signés.
 
+Pour le lancement commercial, le [business plan](../business-model/business-plan.md) cible en priorité les PME et petites équipes techniques françaises qui auto-hébergent déjà leur CI/CD.
+
 ## 4. Proposition de valeur
 
 Les principes qui structurent le projet sont les suivants :
@@ -84,6 +86,8 @@ Au niveau fonctionnel :
 | **V3 — Plateforme avancée** | Simplifier et optimiser l'expérience | Registry, templates, bibliothèque de jobs, indicateurs et optimisation, gestion avancée des ressources |
 
 **V0 à V3 sont des versions du produit ; elles ne doivent pas être confondues avec les versions du format YAML.** Les échéances et l'avancement réel sont suivis dans les référentiels opérationnels du projet, pas déduits de ce tableau.
+
+Le scénario commercial prévoit une bêta V1 au premier semestre 2027, une V2 commercialisable en juillet et une V3 en fin d'année. Le prévisionnel anticipe l'effet de la V3 sur les ventes à partir de 2028.
 
 ## 7. Positionnement et différenciation recherchée
 

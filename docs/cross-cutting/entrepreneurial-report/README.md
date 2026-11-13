@@ -6,7 +6,7 @@ Point d'entrée du **livrable global de la semaine entrepreneuriale**. Chaque pa
 
 1. **Présentation du projet :** [Rustkins — vision, besoins, produit et trajectoire](../company/project-presentation.md)
 2. **Structure de l'entreprise :** [équipe actuelle et organisation future envisagée](../company/company-structure.md)
-3. **Modèle économique :** [Business Model Canvas (synthèse)](../business-model/business-model-canvas.md) et [modèle économique détaillé (référence)](../business-model/business-model.md)
+3. **Modèle économique :** [Business Model Canvas](../business-model/business-model-canvas.md), [modèle économique détaillé](../business-model/business-model.md) et [business plan 2027–2030](../business-model/business-plan.md)
 
 ## Parties à compléter ultérieurement
 
@@ -20,6 +20,6 @@ Les axes 4 à 6 sont **indiqués comme non rédigés dans le présent livrable**
 
 - Séparer les **faits documentés**, les **orientations de projet**, les **hypothèses de marché** et les **décisions en attente**.
 - Ne pas présenter la roadmap comme un état de livraison effectif.
-- Ne pas inventer de statut juridique, de clients, de tarifs, de chiffre d'affaires ou de mesures d'impact.
+- Identifier explicitement les hypothèses de statut juridique, de tarifs, de clients et de chiffre d'affaires du prévisionnel.
 - Garder le dossier de référence dans chaque domaine ; l'assemblage final pourra se faire à partir de ces sources après validation.
 - Les documents de contenu restent au statut `draft` jusqu'à revue de l'équipe.

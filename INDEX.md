@@ -43,6 +43,7 @@ Attention : **version de spécification YAML ≠ version du produit**.
 - [Présentation de Rustkins](docs/cross-cutting/company/project-presentation.md)
 - [Structure de l'équipe et de l'entreprise envisagée](docs/cross-cutting/company/company-structure.md)
 - [Business Model Canvas](docs/cross-cutting/business-model/business-model-canvas.md)
+- [Business plan Rustkins 2027–2030](docs/cross-cutting/business-model/business-plan.md)
 - [Index des domaines transversaux](docs/cross-cutting/README.md)
 - [RGPD et protection des données](docs/cross-cutting/gdpr/README.md)
 - [Compte rendu RGPD — 9 novembre 2026](docs/cross-cutting/gdpr/meeting-notes/2026-11-09-rgpd-meeting.md)

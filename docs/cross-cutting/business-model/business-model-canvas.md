@@ -16,21 +16,21 @@ applies_to: [all]
 
 Rustkins propose **un moteur CI/CD open source, gratuit et auto-hébergé**, sans offre SaaS exploitée par l'éditeur. La monétisation envisagée porte sur **un accompagnement facultatif** : abonnement premium, prestation de déploiement chez le client et développement spécifique facturable.
 
-L'orientation produit et les trois catégories de revenus sont documentées. **La clientèle, les prix, les volumes, les partenaires et la rentabilité restent à vérifier** : ce canvas est une modélisation prospective, pas la description d'une entreprise déjà commercialement active.
+Le [business plan 2027–2030](business-plan.md) chiffre les trois sources de revenus et les coûts associés. La disposition à payer, les volumes et la capacité à livrer restent à vérifier auprès des équipes pilotes.
 
 ## 2. Les neuf blocs du Business Model Canvas
 
 | Bloc | Contenu Rustkins | Niveau de validation |
 | --- | --- | --- |
-| **1. Segments de clientèle** | Développeurs indépendants ; petites équipes de développement ; organisations techniques souhaitant administrer elles-mêmes leurs pipelines ; clients ayant besoin d'intégrations spécifiques. | **Hypothèses de cible**, à confirmer par entretiens et pilotes. |
+| **1. Segments de clientèle** | Priorité commerciale aux PME et petites équipes techniques françaises qui auto-hébergent leur CI/CD. Les indépendants et projets personnels peuvent adopter le moteur gratuit. | **Hypothèses de cible**, à confirmer par entretiens et pilotes. |
 | **2. Proposition de valeur** | Moteur CI/CD gratuit, librement installable sur l'infrastructure utilisateur ; configuration YAML et exécution Docker ; suivi des exécutions ; services facultatifs pour réduire l'effort d'adoption ou répondre à des besoins particuliers. | **Orientation produit documentée** ; valeur perçue et différenciation à tester. |
-| **3. Canaux** | Dépôts GitHub, documentation publique, démonstrations, recommandations de la communauté, échanges directs avec des équipes pilotes. | **Canaux possibles**, aucun résultat d'acquisition ni budget de diffusion établi. |
+| **3. Canaux** | GitHub, documentation publique, démonstrations, pilotes, communauté et prospection B2B. | **Canaux et budget modélisés** dans le prévisionnel. |
 | **4. Relations clients** | Communauté et documentation pour l'offre gratuite ; échanges plus fréquents et priorisation de certains bugs pour les abonnés premium ; suivi contractuel par devis pour installations et développements spécifiques. | **Modèle relationnel envisagé** ; outils, SLA et conditions à définir. |
-| **5. Sources de revenus** | Abonnement premium facultatif ; déploiement/configuration payants sur infrastructure cliente ; développements majeurs sur devis (y compris en complément d'un abonnement). | **Trois axes retenus comme orientation** ; aucun tarif ni chiffre d'affaires fixé. |
-| **6. Ressources clés** | Compétences de l'équipe ; code source et savoir-faire logiciel ; documentation ; outils de développement et de test ; disponibilité pour le support et les missions clients. | **Équipe et référentiels identifiés** ; capacités futures à chiffrer. |
+| **5. Sources de revenus** | Trois packs de support facultatifs, déploiements sur infrastructure cliente et développements spécifiques sur devis. | **Tarifs et chiffre d'affaires prévisionnels**, à tester auprès des pilotes. |
+| **6. Ressources clés** | Compétences des trois fondateurs, code source, documentation, outillage et renforts prévus en commercial puis en support et intégration. | **Capacité prévisionnelle**, à vérifier avec la charge réelle. |
 | **7. Activités clés** | Concevoir, développer, tester et publier Rustkins ; traiter les anomalies ; maintenir les instructions de déploiement ; assurer les prestations convenues ; animer la relation avec les utilisateurs. | **Activités cohérentes avec le modèle**, charge opérationnelle à mesurer. |
 | **8. Partenaires clés** | Communauté open source, premiers utilisateurs pilotes, prestataires juridiques/comptables et intégrateurs potentiels ; écosystèmes Git/Docker et infrastructures clientes. | **Hypothèses de collaboration**, pas de partenariat contractuel affirmé. |
-| **9. Structure de coûts** | Temps de développement et de maintenance ; support et communication ; déplacements/interventions ; environnements de test/démonstration ; administration, facturation, conformité et sécurité. | **Postes identifiés**, montants non déterminés. |
+| **9. Structure de coûts** | Rémunérations, télétravail, site vitrine et CI interne, acquisition, déplacements, comptabilité et prestations juridiques, RGPD et sécurité. | **Coûts chiffrés** dans le prévisionnel. |
 
 ## 3. Traduction concrète des offres
 
@@ -70,14 +70,14 @@ Ce parcours illustre le **modèle recherché**. Il devra être testé pour véri
 
 ### Sources de revenus et coûts
 
-Une fois des données réelles disponibles, un prévisionnel devra distinguer :
+Le prévisionnel distingue :
 
 - **Revenus récurrents :** abonnements premium effectivement facturés et conservés.
 - **Revenus ponctuels :** installations et développements spécifiques, facturés selon les contrats.
 - **Coûts fixes :** administration, outillage, services nécessaires au projet et disponibilité minimale de l'équipe.
 - **Coûts variables :** temps de support, charge de développement et dépenses propres aux prestations.
 
-Une analyse pertinente suivra, entre autres, le **temps moyen de support par abonnement**, la **marge des prestations après temps passé** et la **capacité de l'équipe**. Sans données de prix, de clientèle et de charge, il serait trompeur d'afficher un seuil de rentabilité ou un chiffre d'affaires prévu.
+Le scénario prévoit un premier bénéfice annuel en 2029. Les pilotes permettront de mesurer le **temps moyen de support par abonnement**, la **marge des prestations après temps passé** et la **capacité de l'équipe**.
 
 ### Risques principaux
 
@@ -99,7 +99,7 @@ Une analyse pertinente suivra, entre autres, le **temps moyen de support par abo
 3. **Disposition à payer :** tester séparément l'intérêt pour le support premium, l'installation et le développement spécifique.
 4. **Coût de service :** chronométrer le traitement de demandes pilotes et estimer la capacité de l'équipe.
 5. **Politique open source :** définir licence, contributions et éventuelles modalités d'accès anticipé.
-6. **Tarification :** construire un prévisionnel seulement après l'obtention d'hypothèses étayées.
+6. **Tarification :** tester les trois packs et ajuster le prévisionnel selon la conversion, le renouvellement et la charge observés.
 
 ## 7. Références internes
 

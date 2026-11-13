@@ -69,6 +69,20 @@ La structure suivante est **une proposition d'organisation**, à discuter entre 
 
 Le cumul de plusieurs fonctions par une même personne serait normal au lancement. L'objectif est d'éviter les angles morts : une prestation facturée doit avoir un responsable, un périmètre accepté et des conditions de maintenance explicites.
 
+### Équipe budgétée de 2027 à 2030
+
+Le [business plan](../business-model/business-plan.md) suppose trois fondateurs actifs à temps plein dès janvier 2027, en télétravail intégral. Les montants ci-dessous correspondent au brut annuel équivalent temps plein au démarrage de chaque rémunération.
+
+| Rôle | Début de la rémunération | Brut annuel | Répartition ou missions |
+| --- | --- | ---: | --- |
+| Timothy | Janvier 2027 | 36 000 € | 40 % développement et 60 % direction produit, pilotage, vente et communication |
+| Alexis | Juillet 2028 | 36 000 € | 80 % développement et 20 % tâches transverses, dont coordination et suivi client |
+| Loick | Juillet 2028 | 36 000 € | 80 % développement et 20 % tâches transverses, dont coordination et suivi client |
+| Commercial et communication | Juillet 2029 | 40 000 € | Prospection, démonstrations, suivi des devis et animation des canaux |
+| Support technique et intégration | Juillet 2030 | 44 000 € | Traitement des demandes, déploiements et accompagnement technique |
+
+Alexis et Loick sont budgétés sans rémunération pendant les dix-huit premiers mois. Leurs droits éventuels à l'ARE sont à confirmer individuellement. Le prévisionnel majore le brut de 42 % pour estimer le coût employeur. La comptabilité et la paie sont externalisées, avec des interventions spécialisées pour les contrats, le RGPD et la sécurité.
+
 ## 5. Forme juridique et gouvernance capitalistique : non décidées
 
 À ce stade, les sources du projet **ne précisent pas** :
@@ -79,7 +93,7 @@ Le cumul de plusieurs fonctions par une même personne serait normal au lancemen
 - la répartition des parts ou actions, les apports et la propriété des actifs ;
 - les contrats entre fondateurs, contributeurs et éventuels clients.
 
-Pour le dossier entrepreneurial, **une structure sociétaire permettant une activité à plusieurs associés pourrait être étudiée**, notamment en comparant les formes juridiques adaptées au pays d'implantation retenu. Le choix ne peut pas être déduit du fonctionnement technique du projet et devra être validé après examen juridique, fiscal et social.
+Le dossier entrepreneurial retient une **SAS en France** comme hypothèse de chiffrage. Le choix de la forme sociale et le statut des fondateurs restent à valider après examen juridique, fiscal et social.
 
 Les sujets à arbitrer incluent les pouvoirs de décision, les entrées/sorties d'associés, le financement, la rémunération, la gestion d'un désaccord et le sort du code développé avant la création de l'entité.
 
