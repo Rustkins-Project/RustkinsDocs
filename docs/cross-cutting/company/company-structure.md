@@ -38,13 +38,13 @@ La forme proposée pour la création de Rustkins est la **société par actions 
 
 Les statuts devront préciser les règles de vote, les pouvoirs de signature et les conditions de cession des actions. Les fondateurs peuvent également prévoir un pacte d'associés pour organiser leurs engagements réciproques et les modalités de départ.
 
-## 4. Décisions à préparer
+## 4. Capital, propriété intellectuelle et organisation
 
 ### Capital et propriété intellectuelle
 
-Le prévisionnel retient **50 000 € d'apport au capital**. Il faut décider combien chacun apporte, comment les actions sont réparties et quels droits de vote s'y attachent. La présidence, le pourcentage du capital et les droits de vote sont trois décisions distinctes. Les fondateurs doivent aussi prévoir comment un associé pourra céder ses actions ou quitter l'entreprise.
+Le prévisionnel retient **50 000 € d'apport au capital**. Pour le dossier entrepreneurial, Timothy, Alexis et Loick détiendraient chacun **un tiers du capital**.
 
-Pour le code, la documentation, le nom et le logo Rustkins, il faut identifier les auteurs et titulaires des droits, puis décider quels droits la société doit détenir ou pouvoir exercer. Cela concerne notamment le code écrit avant la création et les contributions externes. Une cession ou une licence peut formaliser les droits nécessaires. Il faut aussi fixer la licence de distribution du logiciel et décider au nom de qui déposer la marque.
+La future société détiendra la **marque Rustkins** et disposera des **droits nécessaires pour publier, distribuer et maintenir le logiciel**, y compris le code et la documentation produits avant sa création. Ces droits seront formalisés avec leurs titulaires. Le logiciel sera distribué sous licence open source.
 
 ### Ressources humaines
 
