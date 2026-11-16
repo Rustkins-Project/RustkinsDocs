@@ -110,8 +110,9 @@ participant Docker
 participant RustFS
 
 MQ->>W: job.assigned (self-contained order)
-W->>W: Check local duplicate registry
-W->>MQ: Publish job.started
+W->>W: Preflight Docker availability (no repository code)
+W->>MQ: Publish job.start.requested
+MQ->>W: job.start.accepted (after Scheduler commit)
 W->>Git: Clone repository
 W->>Git: Checkout commit SHA
 W->>RustFS: Restore upstream artifacts
@@ -237,7 +238,7 @@ it into PostgreSQL.
 
   Event             Resulting JobRun / StepRun state
   ----------------- ------------------------------------------------
-  `job.started`     JobRun `running`
+  `job.start.requested`     JobRun `running`
   `step.finished`   StepRun `success`, `warning` or `failed`
   `job.finished`    JobRun `success`, `warning`, `failed` or `cancelled`
 
@@ -245,12 +246,23 @@ it into PostgreSQL.
 details, log object key and size, artifact metadata and measured
 resource usage.
 
-Events are published with RabbitMQ publisher confirms. `job.finished`
-is kept in a local spool until confirmed, and republished after a
-Worker restart.
+Events are published as persistent messages with RabbitMQ publisher
+confirms. A live Worker keeps an unconfirmed `job.finished` in memory
+and retries publication. After confirmation, the durable Scheduler
+queue retains it until the Scheduler commits and ACKs. If the Worker
+dies before confirmation, the Scheduler checks whether start
+authorization was committed. An unauthorized attempt can be
+reassigned; an authorized attempt becomes `indeterminate` without
+automatic retry by default. With YAML v2 `retry.worker_loss: unsafe`,
+the Scheduler may create a new attempt after Worker loss. No local
+spool survives a restart.
 
-The Scheduler decides whether the next state becomes `retrying` or
-`dead_lettered`.
+The Scheduler retries by default only failures known to precede start
+authorization. An authorized attempt without a confirmed outcome
+becomes `indeterminate`. An explicit YAML v2
+`retry.worker_loss: unsafe` permits a new attempt after Worker loss;
+the previous attempt remains in the audit history and may have
+produced external effects.
 
 ------------------------------------------------------------------------
 
@@ -274,15 +286,22 @@ transitions to `failed`.
 
 RabbitMQ guarantees at-least-once delivery.
 
-The Worker keeps a local registry of accepted `job_run_id:attempt`
-pairs. A duplicate `job.assigned` delivery is acknowledged without
-execution.
+The Worker publishes `job.start.requested` with a fresh `start_request_id` per
+delivery and reuses that ID when retransmitting the same request. It
+waits for a `job.start.accepted` control message with that same ID,
+Worker, JobRun and attempt before launching Docker. The
+Scheduler atomically moves the assigned attempt from `queued` to
+`running`, stores the request ID and puts the acceptance in its outbox.
+A retransmission with the same ID receives the same acceptance without
+another authorization. A different or stale request receives
+`job.start.rejected` and is ACKed without execution.
+The Worker ignores repeated acceptances for an already active delivery
+and retains only the in-memory state of its active jobs.
 
-The Scheduler remains the final arbiter: if it receives a `job.started`
-for a JobRun that is no longer `queued` for this attempt and this
-Worker, it ignores the event and publishes `cancel.job`.
-
-Duplicate execution must never occur.
+An attempt is authorized at most once. By default, the Scheduler does
+not create another attempt when an authorized outcome is unknown. A
+late `job.finished` from the same attempt can resolve `indeterminate`.
+YAML v2 `retry.worker_loss: unsafe` is the explicit exception.
 
 ------------------------------------------------------------------------
 
@@ -308,7 +327,10 @@ Typical infrastructure failures:
 -   RustFS unavailable
 -   Network timeout
 
-These failures follow the retry policy.
+Only failures known to precede start authorization follow the default
+automatic retry policy. After authorization, a lost result cannot be
+assumed safe to replay. YAML v2 `retry.worker_loss: unsafe` explicitly
+opts into that risk for Worker loss.
 
 Business failures (tests, compilation, commands) do not trigger retries.
 
@@ -317,8 +339,11 @@ Business failures (tests, compilation, commands) do not trigger retries.
 # 16. Runtime Invariants
 
 -   One Worker executes one JobRun at a time per reserved slot.
--   One JobRun executes on only one Worker.
--   One Docker container belongs to one JobRun.
+-   Each attempt is assigned to one Worker. Heartbeat loss after start
+    authorization creates no new attempt by default; YAML v2
+    `retry.worker_loss: unsafe` explicitly allows one. An isolated
+    Worker may still be executing the original attempt.
+-   Each attempt owns at most one Docker job container.
 -   Workers never modify scheduling decisions.
 -   Workers never reserve or release worker capacity.
 -   Workers never access PostgreSQL.
@@ -332,8 +357,8 @@ Business failures (tests, compilation, commands) do not trigger retries.
 
 Decision
 
-Workers are stateless executors that communicate only with the
-Scheduler, through RabbitMQ.
+Workers keep no durable execution registry or event spool. They
+communicate only with the Scheduler, through RabbitMQ.
 
 Consequence
 

@@ -345,19 +345,23 @@ Archive content is never stored in PostgreSQL.
 
 Retryable.
 
-Worker retries according to runtime retry policy.
+The live Worker may retry this transfer. A full job replay after
+authorized Worker loss still follows `retry.worker_loss`.
 
 ------------------------------------------------------------------------
 
 ## RustFS unavailable
 
-Retry.
+The live Worker retries the transfer. A full job replay after
+authorized Worker loss still follows `retry.worker_loss`.
 
 ------------------------------------------------------------------------
 
 ## Restore failure
 
-Infrastructure restore failures are retryable.
+Infrastructure restore failures may be retried by a live Worker.
+After authorized Worker loss, a full job replay requires YAML v2
+`retry.worker_loss: unsafe`; otherwise the outcome is `indeterminate`.
 
 Examples:
 

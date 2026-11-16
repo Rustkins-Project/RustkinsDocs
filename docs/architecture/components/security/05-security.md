@@ -60,18 +60,31 @@ PostgreSQL is the authoritative source for identities and permissions.
 Worker isolation
 
 Workers execute arbitrary code from repositories. They therefore have
-**no access to PostgreSQL**: no credentials and no network route
+**no configured access to PostgreSQL**: no credentials and no direct network route
 ([ADR-0001](../../../../decisions/ADR-0001-worker-scheduler-communication.md)).
 
 -   Workers receive self-contained execution orders from the Scheduler
     through RabbitMQ and report events back on `rustkins.events`.
 -   The Scheduler validates every event (sender Worker, attempt, state
     transition) before writing it.
--   Worker RabbitMQ permissions are restricted: read their own job
-    queue and the control queue, write to `rustkins.events` and
-    `rustkins.logs` only.
+-   Each Worker has a distinct RabbitMQ account. Its permissions allow
+    reading only its own job and control queues and publishing only to
+    `rustkins.events` and `rustkins.logs`. Queue and binding creation
+    belongs to the Scheduler. The Scheduler requires RabbitMQ's
+    validated AMQP `user_id` on every Worker event and maps that account
+    to the expected Worker; a payload `worker_id` alone is not proof of
+    identity. Worker accounts have no `impersonator` tag. Topic
+    permissions restrict each Worker's log routing keys to its own
+    prefix; the API checks the sender against the assigned JobRun
+    before streaming logs.
 -   Worker RustFS credentials should be restricted to the `runs/`
     prefix.
+
+The Docker socket grants broad control of its host. A separate Docker
+network is insufficient when a Worker shares a host with PostgreSQL.
+Production Workers run on dedicated hosts, separate from the API,
+Scheduler, PostgreSQL and their Docker daemon. Single-host Compose is
+for local development and does not provide this host-level isolation.
 
 ------------------------------------------------------------------------
 

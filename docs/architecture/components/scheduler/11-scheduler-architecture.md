@@ -235,14 +235,41 @@ The Scheduler, in one transaction:
 The event is acknowledged after commit. Duplicate or stale events are
 ignored.
 
-`job.started` and `step.finished` events are handled the same way and
+`job.start.requested` and `step.finished` events are handled the same way and
 update JobRun `running` and StepRun states.
+
+For `job.start.requested`, the Scheduler first verifies the RabbitMQ-validated
+`user_id`, the assigned Worker and the attempt. In one transaction it
+moves a `queued` attempt to `running`, stores its `start_request_id` and
+inserts an OutboxMessage for `job.start.accepted`. A retransmission
+with the same request ID on the still-current running attempt receives
+another acceptance, without authorizing execution twice. A different
+or stale request receives `job.start.rejected`. Both responses copy
+the request's `start_request_id` so the Worker can match the response
+to its pending delivery.
+The Worker starts Docker only after receiving acceptance. This durable
+authorization replaces a local Worker deduplication registry; each
+attempt can be authorized once. If the Worker disappears after
+authorization without a confirmed final event, the Scheduler cannot
+know whether external effects occurred. It marks the JobRun
+`indeterminate` and does not automatically dispatch another attempt by
+default.
+A late valid `job.finished` from the original Worker and attempt may
+resolve this state.
 
 ------------------------------------------------------------------------
 
 # 10. Retry Management
 
-Infrastructure failures only.
+Automatic retries apply by default only to failures before start
+authorization. Once `job.start.accepted` is committed, a lost outcome
+becomes `indeterminate` without retry. YAML v2 permits an explicit
+`retry.worker_loss: unsafe` per job: on Worker loss, record the old
+attempt as `indeterminate` and schedule a new attempt if the global
+three-attempt limit permits. The JobRun becomes `retrying`; a late
+result from the old attempt remains audit data and cannot overwrite
+the current attempt. This option can repeat external effects. V0 and
+YAML v1 use the safe default `never`.
 
 Policy
 
@@ -258,12 +285,16 @@ Maximum attempts
 3
 ```
 
-When exhausted
+When pre-authorization retries are exhausted
 
 ``` text
 JobRun = dead_lettered
 PipelineRun = failed
 ```
+
+If an authorized Worker is lost without a confirmed result and the
+attempt limit is exhausted, the JobRun and PipelineRun are
+`indeterminate`, including with `retry.worker_loss: unsafe`.
 
 ------------------------------------------------------------------------
 
@@ -278,7 +309,8 @@ cancelled
 Running JobRun
 
 1.  cancel_requested
-2.  create cancel OutboxMessage
+2.  create cancel OutboxMessage routed to the assigned Worker's control
+    queue; a run-wide cancellation targets each Worker with active jobs
 3.  wait for the Worker `job.finished` event with status `cancelled`
 4.  release resources
 5.  mark JobRun cancelled
@@ -286,7 +318,7 @@ Running JobRun
 Timeout
 
 ``` text
-failed
+indeterminate if the Worker may have executed code and no final result is confirmed
 ```
 
 ------------------------------------------------------------------------
@@ -299,19 +331,30 @@ Scheduler
 
 -   marks Worker offline
 -   releases reservations
--   evaluates running JobRuns
+-   checks whether each assigned attempt was authorized to start
 
-If attempts remain
+If start was never authorized and attempts remain
 
 ``` text
 retrying
 ```
 
-Otherwise
+If start was never authorized and attempts are exhausted
 
 ``` text
 dead_lettered
 ```
+
+If start was authorized and no final event was confirmed:
+
+``` text
+indeterminate
+```
+
+The Scheduler does not dispatch another attempt or unlock dependent
+jobs. A late event from the same Worker and attempt can still resolve
+the outcome. Reconnecting Workers must report existing containers
+before accepting new assignments.
 
 ------------------------------------------------------------------------
 
@@ -324,6 +367,7 @@ success
 warning
 failed
 cancelled
+indeterminate
 ```
 
 only after every JobRun reaches a final state.
@@ -357,7 +401,7 @@ Scheduler reacts to
 -   PipelineRun created
 -   `worker.registered`
 -   `worker.heartbeat`
--   `job.started`
+-   `job.start.requested`
 -   `step.finished`
 -   `job.finished`
 -   Retry timeout
@@ -380,13 +424,16 @@ No reservation is rolled back because RabbitMQ is transport only.
 
 Publication resumes when RabbitMQ is available.
 
-Worker events are delayed. Workers keep `job.finished` in a local
-spool and republish it. Heartbeat timeouts must tolerate a short
-broker outage before marking Workers offline.
+Worker events are delayed. Live Workers retry unconfirmed events in
+memory; confirmed events stay in RabbitMQ until the Scheduler commits
+and ACKs them. Heartbeat timeouts must tolerate a short broker outage
+before marking Workers offline.
 
 Worker unavailable
 
-Retry or dead_lettered.
+Before authorization: retry or `dead_lettered`. After authorization:
+`indeterminate` by default; retry only with explicit YAML v2
+`retry.worker_loss: unsafe` and remaining attempts.
 
 Oversized Job
 
