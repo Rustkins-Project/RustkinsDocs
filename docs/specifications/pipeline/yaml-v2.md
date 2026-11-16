@@ -3,8 +3,8 @@ id: DOC-0018
 title: "Rustkins Pipeline Specification v2 (V1 Scope)"
 type: specification
 status: draft
-summary: "Format YAML v2 pour Rustkins V1 : variables, déclenchement API, ressources, artéfacts et conditions run_if."
-topics: [pipeline, yaml, resources, artifacts]
+summary: "Format YAML v2 pour Rustkins V1 : variables, déclenchement API, ressources, artéfacts, run_if et retry après perte du Worker."
+topics: [pipeline, yaml, resources, artifacts, retry]
 applies_to: [V1]
 specification_version: "2"
 ---
@@ -26,7 +26,8 @@ La version 2 étend la version 1 avec des fonctionnalités nécessaires à un us
 * artifacts ;
 * jobs optionnels ;
 * steps non bloquantes avec `continue_on_error` ;
-* politique d'exécution avec `run_if`.
+* politique d'exécution avec `run_if` ;
+* politique explicite de relance après perte du Worker avec `retry.worker_loss`.
 
 Les fonctionnalités lourdes comme les secrets, le cache, les services/sidecars, la matrix et les conditions avancées `when` restent hors périmètre de cette version.
 
@@ -125,6 +126,9 @@ jobs:
   test:
     needs:
       - build
+
+    retry:
+      worker_loss: never
 
     vars:
       NODE_ENV: test
@@ -458,6 +462,42 @@ Le pipeline peut alors finir en `warning` au lieu de `failed`.
 * `optional` est optionnel ;
 * si absent, sa valeur par défaut est `false` ;
 * doit être un booléen.
+
+## 10.2 Relance après perte du Worker
+
+Un job peut choisir une relance automatique lorsque son Worker disparaît après
+l'autorisation de démarrer et avant la confirmation du résultat :
+
+```yaml
+jobs:
+  publish:
+    retry:
+      worker_loss: unsafe
+    steps:
+      - run: ./publish.sh
+```
+
+`retry.worker_loss` accepte `never` (valeur par défaut) ou `unsafe`.
+Avec `never`, le job et le pipeline passent `indeterminate` : aucun descendant
+ne démarre, y compris avec `run_if: always`. Un résultat tardif authentifié
+de la tentative peut résoudre cet état. Sinon, un opérateur vérifie les effets
+externes avant de lancer une nouvelle exécution.
+
+Avec `unsafe`, le Scheduler peut créer une nouvelle tentative après perte du
+Worker, dans la limite globale de trois tentatives et avec les délais de retry
+V1. La tentative précédente est conservée comme `indeterminate` dans
+l'historique ; le JobRun passe `retrying`. Un résultat tardif de cette ancienne
+tentative ne modifie pas l'état de la nouvelle. Les commandes du job peuvent
+donc produire deux fois les mêmes effets externes. Réserver cette option aux
+jobs dont les effets sont idempotents ou acceptent explicitement ce risque.
+Si la limite de tentatives est atteinte après une perte autorisée sans
+résultat confirmé, le job et le pipeline restent `indeterminate`, et non
+`dead_lettered` : leur issue demeure inconnue.
+Elle ne s'applique ni aux erreurs métier ni aux échecs d'infrastructure dont
+le résultat est connu.
+
+Cette option est propre à la spécification YAML v2 ; la V0 et les pipelines
+`version: 1` conservent le comportement par défaut `never`.
 
 ## Recommandation de nommage
 
@@ -968,6 +1008,10 @@ Si un job termine en `warning` :
 * les jobs dépendants avec `run_if: on_failure` ne s'exécutent pas uniquement à cause de ce warning ;
 * le PipelineRun final devient `warning` si aucun job obligatoire ne termine en `failed`.
 
+Un job `indeterminate` n'a pas de résultat final connu : il bloque tous ses
+descendants jusqu'à résolution. La relance automatique après perte du Worker
+nécessite `retry.worker_loss: unsafe` sur ce job.
+
 Exemple :
 
 ```text
@@ -1077,6 +1121,7 @@ job.needs = ["build"]
 job.timeout = default_timeout
 job.run_if = all_success
 job.optional = false
+job.retry.worker_loss = never
 job.resources.cpu = default_cpu
 job.resources.memory = default_memory
 job.vars = merge(global_vars, job_vars)
@@ -1166,6 +1211,9 @@ jobs:
     image: string
 
     optional: boolean
+
+    retry:
+      worker_loss: never | unsafe
 
     vars:
       KEY: string
@@ -1265,6 +1313,17 @@ jobs:
           "optional": {
             "type": "boolean"
           },
+          "retry": {
+            "type": "object",
+            "required": ["worker_loss"],
+            "properties": {
+              "worker_loss": {
+                "type": "string",
+                "enum": ["never", "unsafe"]
+              }
+            },
+            "additionalProperties": false
+          },
           "image": {
             "type": "string",
             "minLength": 1
@@ -1350,6 +1409,7 @@ Certaines règles doivent être validées par le moteur Rustkins :
 * les identifiants de jobs doivent être uniques ;
 * chaque job doit avoir une image résolue, soit par `jobs.<job_id>.image`, soit par l'image globale `image` ;
 * `optional` absent doit être normalisé à `false` ;
+* `retry` absent doit être normalisé à `worker_loss: never` ;
 * `continue_on_error` absent doit être normalisé à `false` ;
 * une step en `warning` doit rendre le job `warning` si aucune erreur bloquante ne survient ensuite ;
 * un job optionnel qui rencontre une erreur métier doit terminer en `warning`, pas en `failed` ;

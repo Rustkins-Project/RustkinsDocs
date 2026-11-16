@@ -147,6 +147,7 @@ Contains
 -   image
 -   run_if
 -   optional
+-   retry_worker_loss
 -   cpu
 -   memory
 -   timeout
@@ -156,6 +157,10 @@ These definitions never change.
 `optional` is part of the immutable job definition because it changes how
 runtime failures are classified: an optional job may end in `warning`
 instead of failing the PipelineRun.
+
+`retry_worker_loss` is also immutable (`never` by default, `unsafe` only
+when explicitly declared in YAML v2). The Scheduler reads it before
+deciding whether an authorized Worker loss may create a new attempt.
 
 ------------------------------------------------------------------------
 
