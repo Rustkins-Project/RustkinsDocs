@@ -597,7 +597,8 @@ Le Scheduler :
 - calcule le statut final du run ;
 - enregistre les états remontés par les workers (`JobRun`, `StepRun`, métadonnées de logs et d'artifacts, heartbeats).
 
-Le Scheduler est le **seul composant qui écrit l'état d'exécution**.
+Le Scheduler est le **seul composant qui décide et écrit les transitions
+d'exécution**.
 
 ---
 
@@ -668,7 +669,7 @@ Le Worker **n'accède pas à PostgreSQL**. Il publie sur `rustkins.events` :
 | `step.finished` | statut du step, code de retour, horodatages |
 | `job.finished` | statut final, code de retour, horodatages, détail d'erreur infrastructure, clé du log, métadonnées des artifacts, consommation de ressources |
 
-Le Scheduler exige le `user_id` AMQP validé par RabbitMQ et le compare au compte du worker assigné. Pour `job.start.requested`, il inscrit `running`, conserve le `start_request_id` dans la tentative et publie `job.start.accepted` via l'outbox. Une retransmission de la même demande sur la tentative encore active reçoit à nouveau l'acceptation ; une autre demande ou une tentative périmée reçoit `job.start.rejected`. La réponse reprend le `start_request_id` de la demande ; le Worker ne lance Docker qu'après avoir reçu l'acceptation correspondant à sa livraison en cours. Les autres événements sont validés, écrits en base puis acquittés après commit.
+Le Scheduler exige le `user_id` AMQP validé par RabbitMQ et le compare au compte du worker assigné. Pour `job.start.requested`, il inscrit `running`, conserve le `start_request_id` dans la tentative et crée l'`OutboxMessage` de `job.start.accepted` dans la même transaction. Une retransmission de la même demande sur la tentative encore active reçoit à nouveau l'acceptation via l'outbox ; une autre demande ou une tentative périmée reçoit `job.start.rejected` par le même mécanisme. La réponse reprend le `start_request_id` de la demande ; le Worker ne lance Docker qu'après avoir reçu l'acceptation correspondant à sa livraison en cours. Le Scheduler acquitte la demande après avoir enregistré sa réponse. Les autres événements sont validés, écrits en base puis acquittés après commit.
 
 Le Worker ne réserve pas et ne libère pas de ressources. Cette responsabilité reste au Scheduler.
 

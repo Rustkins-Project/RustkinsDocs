@@ -370,6 +370,13 @@ Accès requis : lecture/écriture.
 ### 9.3 API → RabbitMQ
 
 L'API publie un message lorsqu'un utilisateur déclenche un run.
+Elle enregistre d'abord le `pipeline_run` en `pending` dans PostgreSQL,
+puis publie `PipelineRunRequested` comme message persistant avec
+confirmation RabbitMQ. Ce message réveille le Scheduler ; il ne constitue
+pas l'unique trace du run demandé. Le Scheduler recherche aussi les runs
+`pending` en base au démarrage et périodiquement.
+Le traitement d'un même `run_id` est idempotent si l'annonce est
+redélivrée.
 
 Exemple de message `PipelineRunRequested` :
 
@@ -394,6 +401,9 @@ Le Scheduler lit :
 - les dépendances `needs` ;
 - les statuts des jobs terminés.
 
+Il réconcilie périodiquement les runs `pending` et les jobs `queued`,
+ainsi qu'au démarrage, même si aucun nouveau message RabbitMQ n'arrive.
+
 Le Scheduler écrit :
 
 - les jobs prêts en statut `queued` ;
@@ -405,12 +415,13 @@ Le Scheduler écrit :
 ### 9.5 Scheduler → RabbitMQ
 
 Quand un job est prêt, le Scheduler publie un ordre autonome
-`JobRunRequested`. Il résout les données nécessaires avant publication :
+`job.assigned`. Il résout les données nécessaires avant publication :
 le Worker ne peut pas les relire dans PostgreSQL.
 
 ```json
 {
-  "run_id": "uuid",
+  "type": "job.assigned",
+  "pipeline_run_id": "uuid",
   "job_run_id": "uuid",
   "worker_id": "uuid",
   "attempt": 1,
@@ -420,19 +431,29 @@ le Worker ne peut pas les relire dans PostgreSQL.
     "timeout_seconds": 3600,
     "steps": [ { "index": 0, "run": "npm run build" } ]
   },
-  "log_key": "runs/{run_id}/jobs/{job_run_id}/logs.txt"
+  "log_key": "runs/{pipeline_run_id}/jobs/{job_run_id}/logs.txt"
 }
 ```
 
 La V0 n'a ni artefacts amont ni réservation multi-worker. Le contrat
 contient néanmoins l'image, les steps, le SHA et la clé du log ; aucun
 de ces champs ne dépend d'une lecture de base par le Worker.
+Le `worker_id` correspond à l'unique `WORKER_V0_ID` configuré.
+La V0 utilise une file durable de jobs et une file durable de contrôle
+pour ce seul Worker.
+
+Le Scheduler publie directement `job.assigned` comme message persistant
+dans une file durable et attend la confirmation RabbitMQ. Au démarrage
+et périodiquement, il reprend les jobs encore `queued` et republie leur
+ordre si nécessaire. Un ordre déjà livré peut alors être
+dupliqué ; l'autorisation de démarrer empêche ces livraisons d'exécuter
+deux fois la même tentative.
 
 ---
 
 ### 9.6 Worker → RabbitMQ
 
-Le Worker consomme les messages `JobRunRequested`.
+Le Worker consomme les messages `job.assigned`.
 
 Règles V0 recommandées :
 
@@ -446,7 +467,7 @@ Règles V0 recommandées :
 ```
 
 Le Worker publie `job.start.requested` puis attend l'autorisation du Scheduler
-avant de lancer Docker. Il acquitte `JobRunRequested` après confirmation
+avant de lancer Docker. Il acquitte `job.assigned` après confirmation
 par RabbitMQ de `job.finished` ; un refus de démarrage est acquitté sans
 exécution. Aucun registre de déduplication ni spool durable n'est tenu
 sur le Worker.
@@ -461,7 +482,13 @@ Le Scheduler ne relance pas automatiquement cette tentative.
 
 ### 9.7 Worker → Scheduler
 
-Le Worker n'accède pas à PostgreSQL ([ADR-0001](../../../decisions/ADR-0001-worker-scheduler-communication.md)). Il envoie `job.start.requested` (`job_run_id`, `attempt`, `start_request_id`) au Scheduler via RabbitMQ. Le Scheduler valide la tentative, écrit `running` et conserve le `start_request_id`, puis renvoie `job.start.accepted` avec ce même ID. Une retransmission de la même demande encore active reçoit à nouveau l'acceptation ; une demande différente ou périmée reçoit `job.start.rejected`. Le Worker n'exécute le job qu'après acceptation correspondante. Il envoie ensuite `job.finished` (`job_run_id`, `attempt`, statut, code de retour, horodatages, `log_key`). Le Scheduler valide et écrit le résultat, puis publie les jobs suivants. Les événements confirmés restent dans une file durable jusqu'à l'ACK du Scheduler après commit.
+Le Worker n'accède pas à PostgreSQL ([ADR-0001](../../../decisions/ADR-0001-worker-scheduler-communication.md)). Il publie `job.start.requested` (`job_run_id`, `attempt`, `start_request_id`) comme message persistant avec confirmation RabbitMQ. Le Scheduler le consomme avec ACK manuel dans une file durable. Il vérifie le compte du seul Worker V0 configuré, le numéro de tentative et le statut `queued`, puis enregistre `running` et le `start_request_id` dans `job_runs`. Ce commit autorise durablement la tentative, même si le Worker attend encore la réponse.
+
+Le Scheduler publie directement `job.start.accepted` avec le même ID dans la file de contrôle durable du Worker. Il attend la confirmation RabbitMQ avant d'ACK la demande. Si la publication ou l'ACK échoue, la demande redélivrée avec le même ID reçoit à nouveau l'acceptation tant que la tentative est encore active, sans nouvelle autorisation. Une demande différente ou périmée reçoit `job.start.rejected`, également confirmé avant l'ACK. Le Worker n'exécute le job qu'après l'acceptation correspondant à sa demande en attente. Un retry avant autorisation incrémente `attempt_number` et remet `start_request_id` à `null` avant un nouvel ordre `job.assigned`.
+
+Le Worker envoie ensuite `job.finished` (`job_run_id`, `attempt`, statut, code de retour, horodatages, `log_key`). Le Scheduler valide et écrit le résultat, puis publie les jobs suivants. Les événements confirmés restent dans une file durable jusqu'à l'ACK du Scheduler après commit.
+
+La V0 ne possède ni table d'outbox ni publisher associé. La V1 spécifie cette garantie supplémentaire pour ses ordres et contrôles dans [ARCH-02](../../architecture/components/messaging/02-rabbitmq-architecture.md).
 
 ---
 
@@ -639,6 +666,8 @@ erDiagram
     string name
     string image
     string status
+    int attempt_number
+    uuid start_request_id
     json needs_json
     int exit_code
     string log_object_key
@@ -744,12 +773,17 @@ Représente l'exécution d'un job du pipeline.
 | `name` | text | Nom affiché |
 | `image` | text | Image Docker utilisée |
 | `status` | text | Statut |
+| `attempt_number` | int | Tentative courante, incrémentée uniquement avant une nouvelle autorisation |
+| `start_request_id` | uuid, nullable | Demande acceptée pour la tentative courante ; `null` avant autorisation |
 | `needs_json` | jsonb | Dépendances |
 | `exit_code` | int | Code de retour global du job |
 | `log_object_key` | text | Clé RustFS des logs |
 | `log_expired` | boolean | Logs supprimés ou non |
 | `started_at` | timestamp | Début |
 | `finished_at` | timestamp | Fin |
+
+La V0 ne conserve que la tentative courante dans `job_runs` ;
+l'historique des tentatives distinctes arrive en V1.
 
 ---
 
@@ -814,43 +848,61 @@ sequenceDiagram
   API->>PG: Crée pipeline_version
   API->>PG: Crée pipeline_run, job_runs, step_runs
   API->>MQ: Publie PipelineRunRequested
+  MQ-->>API: Confirme la publication
   API-->>UI: Run créé
 
   Scheduler->>MQ: Consomme ou observe le run demandé
   Scheduler->>PG: Lit jobs pending + needs
   Scheduler->>PG: Marque build queued
-  Scheduler->>MQ: Publie JobRunRequested(build)
+  Scheduler->>MQ: Publie job.assigned(build)
+  MQ-->>Scheduler: Confirme la publication
 
-  Worker->>MQ: Consomme JobRunRequested(build)
+  Worker->>MQ: Consomme job.assigned(build)
   Worker->>Docker: Vérifie la disponibilité du démon (sans exécuter le dépôt)
-  Worker->>MQ: Signale build démarré
-  Scheduler->>PG: Valide la tentative et marque build running
-  Scheduler->>MQ: Publie job.start.accepted(build)
+  Worker->>MQ: Publie job.start.requested(build)
+  MQ-->>Worker: Confirme la demande
+  MQ->>Scheduler: Livre job.start.requested(build)
+  Scheduler->>PG: Valide et inscrit running + start_request_id
+  Scheduler->>MQ: Publie job.start.accepted(build) persistant
+  MQ-->>Scheduler: Confirme la publication
+  Scheduler->>MQ: ACK job.start.requested(build)
   MQ->>Worker: Livre job.start.accepted(build)
   Worker->>Git: Clone repo au SHA
   Worker->>Docker: Pull image node:22
   Worker->>Docker: Create/start container
   Docker->>Job: Exécute npm install puis npm run build
   Worker->>FS: Écrit logs build
-  Worker->>MQ: Signale build terminé
-  Worker->>MQ: Ack message
+  Worker->>MQ: Publie job.finished(build)
+  MQ-->>Worker: Confirme la publication
+  Worker->>MQ: ACK job.assigned(build)
+  MQ->>Scheduler: Livre job.finished(build)
 
   Scheduler->>PG: Marque build success/failed
+  Scheduler->>MQ: ACK job.finished(build) après commit
   Scheduler->>PG: Détecte test prêt si build success
   Scheduler->>PG: Marque test queued
-  Scheduler->>MQ: Publie JobRunRequested(test)
+  Scheduler->>MQ: Publie job.assigned(test)
+  MQ-->>Scheduler: Confirme la publication
 
-  Worker->>MQ: Consomme JobRunRequested(test)
+  Worker->>MQ: Consomme job.assigned(test)
   Worker->>Docker: Vérifie la disponibilité du démon (sans exécuter le dépôt)
-  Worker->>MQ: Signale test démarré
-  Scheduler->>PG: Valide la tentative et marque test running
-  Scheduler->>MQ: Publie job.start.accepted(test)
+  Worker->>MQ: Publie job.start.requested(test)
+  MQ-->>Worker: Confirme la demande
+  MQ->>Scheduler: Livre job.start.requested(test)
+  Scheduler->>PG: Valide et inscrit running + start_request_id
+  Scheduler->>MQ: Publie job.start.accepted(test) persistant
+  MQ-->>Scheduler: Confirme la publication
+  Scheduler->>MQ: ACK job.start.requested(test)
   MQ->>Worker: Livre job.start.accepted(test)
   Worker->>Docker: Create/start container
   Docker->>Job: Exécute npm test
   Worker->>FS: Écrit logs test
-  Worker->>MQ: Signale test terminé
+  Worker->>MQ: Publie job.finished(test)
+  MQ-->>Worker: Confirme la publication
+  Worker->>MQ: ACK job.assigned(test)
+  MQ->>Scheduler: Livre job.finished(test)
   Scheduler->>PG: Marque test success/failed
+  Scheduler->>MQ: ACK job.finished(test) après commit
 
   Scheduler->>PG: Calcule statut final du run
   UI->>API: GET /api/runs/{id}
@@ -1411,6 +1463,11 @@ La V0 est considérée comme validée si :
 18. Les données PostgreSQL survivent à un redémarrage des conteneurs.
 19. Les logs RustFS survivent à un redémarrage des conteneurs.
 20. La stack peut être lancée sur une VM V0 mononode.
+21. Un `job.assigned` redélivré n'exécute pas deux fois la même tentative.
+22. Si le Scheduler tombe après avoir enregistré l'autorisation mais avant d'avoir confirmé la réponse, la demande redélivrée reçoit la même acceptation sans nouvelle autorisation.
+23. La perte d'un Worker après autorisation sans résultat confirmé laisse le job et le run `indeterminate`, sans retry automatique.
+24. Un run `pending` reste planifiable après perte de son annonce RabbitMQ : le Scheduler le reprend depuis PostgreSQL.
+25. Un job `queued` dont l'ordre n'a pas été confirmé est republié sans autoriser une seconde exécution de la même tentative.
 
 ---
 
