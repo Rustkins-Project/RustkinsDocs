@@ -144,7 +144,7 @@ Le portail d'administration est consulté en interne et le site vitrine aura un 
 
 ## 4. Métriques nécessaires
 
-Les leviers §3.1, §3.3 et §3.8 reposent tous sur des métriques qui **ne sont spécifiées nulle part** aujourd'hui. C'est le premier manque à combler.
+Un premier contrat V1 existe : `job.finished` transporte `cpu_seconds` et `memory_peak_mb` quand le Worker peut les mesurer ([ARCH-02 §9](../../architecture/components/messaging/02-rabbitmq-architecture.md#9-worker-events)) ; le Scheduler les conserve par tentative dans `JOB_RUN_ATTEMPT` ([modèle de données](../../architecture/data-model/10-data-model-reference.md#job_run_attempt)). La durée murale se déduit des horodatages. La collecte, l'affichage et l'export effectifs, ainsi que les autres métriques ci-dessous, restent à spécifier. C'est le premier manque à combler pour piloter les leviers §3.1, §3.3 et §3.8.
 
 | Niveau | Métriques | Source possible |
 | --- | --- | --- |
@@ -165,7 +165,7 @@ L'équipe a identifié que RabbitMQ est probablement **surdimensionné** pour le
 Constats dans la documentation :
 
 - PostgreSQL est déjà la source de vérité et alimente RabbitMQ par une outbox transactionnelle ([ARCH-02](../../architecture/components/messaging/02-rabbitmq-architecture.md)). Une file de jobs dans PostgreSQL (`SELECT … FOR UPDATE SKIP LOCKED`) et des notifications `LISTEN/NOTIFY` couvriraient une partie des usages. Le transport des logs en temps réel vers plusieurs lecteurs est le cas où un broker apporte le plus.
-- **Isolation des workers :** la documentation faisait auparavant accéder les workers directement à PostgreSQL. Ils relisaient le JobRun et écrivaient eux-mêmes les états d'exécution. Ce point est corrigé par l'[ADR-0001](../../../decisions/ADR-0001-worker-scheduler-communication.md) (proposée) : les workers n'ont plus d'accès à la base, reçoivent des ordres d'exécution autonomes dans leur propre file, et remontent leurs événements au Scheduler, seul à écrire l'état. L'isolation repose donc sur RabbitMQ, comme voulu.
+- **Isolation des workers :** la documentation faisait auparavant accéder les workers directement à PostgreSQL. Ils relisaient le JobRun et écrivaient eux-mêmes les états d'exécution. Ce point est corrigé par l'[ADR-0001](../../../decisions/ADR-0001-worker-scheduler-communication.md) (proposée) : les workers n'ont plus d'accès à la base, reçoivent des ordres d'exécution autonomes dans leur propre file, et remontent leurs événements au Scheduler, seul à écrire l'état. L'isolation de la base repose sur cette séparation et sur la validation des événements par le Scheduler ; RabbitMQ transporte les messages.
 - L'isolation ne dépend pas du broker : elle s'obtient dès que les workers **ne détiennent aucun identifiant PostgreSQL** et passent par un intermédiaire qui valide leurs messages (RabbitMQ consommé par le scheduler, ou une API interne dédiée aux workers).
 
 **Orientation :** conserver RabbitMQ pour sortir la V1, l'architecture étant déjà conçue autour. Isoler l'accès au broker derrière une interface (trait Rust) pour qu'un remplacement ultérieur reste localisé. Mesurer l'empreinte du broker sur l'installation de référence. Un éventuel remplacement du broker devra conserver cette isolation (les workers ne parlent qu'au Scheduler). Toute décision de remplacement du broker passe aussi par une ADR.
@@ -181,8 +181,9 @@ Constats dans la documentation :
 
 ## 6. Communication
 
-- Les arguments de performance portent sur la **conception**, pas sur la vitesse brute : **provisionnement intelligent** (réservation par job, consolidation, signaux de capacité), **cache intégré**, **sobriété par défaut** (rétentions, limites, suggestions) et **métriques de consommation visibles**.
-- Face à Jenkins : Jenkins sait provisionner des agents à la demande (plugins Kubernetes, EC2), mais ce n'est ni mis en avant ni le comportement par défaut, et sa configuration laisse passer des installations très gaspilleuses (agents allumés en permanence et mal répartis). L'argument juste est que **Rustkins rend la configuration sobre simple et visible par défaut**. Ne pas affirmer qu'il « consomme moins que Jenkins » sans mesure comparative publiée, conformément à la règle de [positionnement](../communication/positioning-and-messages.md).
+- Pour la V1, décrire les choix documentés : réservation de ressources par job, sélection d'un worker compatible et durées de rétention définies. La consolidation dépend d'un ordre stable des workers ; elle doit être vérifiée avant d'être revendiquée comme comportement produit.
+- Présenter le cache déclaratif comme **prévu en V2**, et les suggestions de dimensionnement, signaux de capacité et métriques visibles comme des pistes tant qu'ils ne sont pas spécifiés et livrés. Les arguments de sobriété portent sur des mécanismes effectivement disponibles, sans promettre une baisse chiffrée.
+- Face à Jenkins : Jenkins sait provisionner des agents à la demande (plugins Kubernetes, EC2), mais ce n'est ni mis en avant ni le comportement par défaut, et sa configuration laisse passer des installations très gaspilleuses (agents allumés en permanence et mal répartis). L'argument juste est que **Rustkins veut rendre la configuration sobre simple et visible par défaut** ; vérifier chaque fonction avant de l'annoncer comme disponible. Ne pas affirmer qu'il « consomme moins que Jenkins » sans mesure comparative publiée, conformément à la règle de [positionnement](../communication/positioning-and-messages.md).
 - Rust allège l'orchestrateur lui-même (pas de machine virtuelle Java, pas de ramasse-miettes, faible empreinte mémoire). En revanche, il ne change rien à la consommation des jobs (compilations, tests), qui représente l'essentiel du total quel que soit l'orchestrateur. C'est un argument valable, pas un argument chiffré.
 - Pas d'allégation générique (« CI verte », « éco-responsable ») : la directive (UE) 2024/825 interdit les allégations environnementales génériques non étayées.
 
@@ -190,7 +191,7 @@ Constats dans la documentation :
 
 | Manque | Document concerné | Priorité suggérée |
 | --- | --- | --- |
-| Collecte et exposition des métriques de consommation par job et par worker | Nouvelle spécification, ARCH-06, ARCH-09 | Haute : prérequis des autres leviers |
+| Collecte effective, exposition et export des métriques de consommation par job et par worker, au-delà des deux champs V1 de `job.finished` | Nouvelle spécification, ARCH-06, ARCH-09 | Haute : prérequis des autres leviers |
 | Comparaison ressources réservées / consommées et suggestion de dimensionnement | ARCH-06 | Haute |
 | Validation et fusion de l'[ADR-0001](../../../decisions/ADR-0001-worker-scheduler-communication.md) (workers sans accès à PostgreSQL) | `decisions/` | Haute : sécurité |
 | Rétention des logs configurable (60 jours par défaut, déjà défini) | ARCH-03 | Basse |

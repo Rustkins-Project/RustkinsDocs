@@ -146,7 +146,7 @@ Permettre l'utilisation réelle de Rustkins au sein d'une petite équipe.
 * Annulation d'un job
 * Retry RabbitMQ
 * Dead Letter Queues
-* Idempotence côté worker
+* Autorisation idempotente des tentatives côté Scheduler
 
 ### Logs
 

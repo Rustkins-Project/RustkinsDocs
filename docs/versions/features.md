@@ -24,7 +24,7 @@ applies_to: [all]
 | Steps séquentiels par job | Faible | Boucle ordonnée, arrêt au premier step rouge, capture exit code par step. |
 | 1 container Docker/job + champ `image` | Faible | bollard fait le travail. Create → start → wait → logs → remove. |
 | Limites CPU/RAM container | Faible | Passées à l'API Docker au create. Presque gratuit. |
-| RabbitMQ (ack manuel, durable, retry, DLQ) | Moyen | La config est simple, la **logique de retry safe** (dédup) l'est moins. |
+| RabbitMQ (ack manuel, durable, retry, DLQ) | Moyen | La déduplication d'une tentative et la reprise après perte du Worker demandent un suivi durable côté Scheduler. Par défaut, une tentative autorisée sans résultat devient `indeterminate`. |
 | Logs persistés sur rustfs | Faible | Append fichier par job-run. |
 | SQLite + entité job-run | Faible/Moyen | Schéma propre (définition vs instance), transitions transactionnelles. |
 | Clone Git au SHA | Faible | libgit2 ou shell out. Attention aux repos privés (clés de déploiement). |
@@ -40,7 +40,7 @@ applies_to: [all]
 | Logs temps réel (SSE tail) | Moyen | Reconnexion, multi-client, rattrapage du déjà-écrit à la connexion. Tu peux le **couper au MVP** (logs après coup) et l'ajouter ensuite. |
 | Scheduling resource-aware (admission CPU/RAM) | Moyen | Compteur de capacité nœud, réservation/libération. Sans ça tu sur-souscris le nœud. |
 | Annulation (kill in-flight) | Moyen | Message kill → tuer les containers en cours → drainer la ready-queue. Propagation pas triviale. |
-| At-least-once + clé d'idempotence | Moyen | Dédup côté worker pour que le retry ne ré-exécute pas un job déjà fait. |
+| At-least-once + clé d'idempotence | Moyen | Le Scheduler autorise une seule exécution par tentative. Après perte du Worker autorisé, le YAML v2 permet une nouvelle tentative uniquement avec `retry.worker_loss: unsafe` ; elle peut répéter les effets externes du job. |
 | Webhook trigger (HMAC) | Faible | Vérif signature. Petit mais obligatoire pour Git. |
 | Auth UI (JWT) | Faible/Moyen | Login + middleware. |
 | API tokens scopés (trigger machine) | Faible | Tokens par projet. |
