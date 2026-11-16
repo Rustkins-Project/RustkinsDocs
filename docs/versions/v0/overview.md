@@ -124,7 +124,7 @@ La V0 doit rester volontairement limitée. L'objectif n'est pas encore de faire 
 |---|---|
 | Déploiement dev | Docker Compose local |
 | Déploiement V0 cible | VM unique mononode |
-| Orchestration prod V0 | Docker Compose ou Swarm mono-node |
+| Orchestration du pilote V0 | Docker Compose ou Swarm mono-node, sans isolation forte des workers |
 | Exposition HTTP | Traefik devant UI/API |
 | HTTPS | Hors V0, HTTP au début |
 | Git | Dépôts publics uniquement |
@@ -235,7 +235,7 @@ flowchart TD
     Scheduler --> MQ
 
     Worker --> MQ
-      Worker --> FS
+    Worker --> FS
     Worker --> DockerSock[/var/run/docker.sock/]
 
     PG --> PGVolume
@@ -397,21 +397,36 @@ Le Scheduler lit :
 Le Scheduler écrit :
 
 - les jobs prêts en statut `queued` ;
-- les runs en statut `running`, `success` ou `failed` ;
+- les runs en statut `running`, `success`, `failed` ou `indeterminate` ;
 - les jobs dépendants en `skipped` en cas de fail-fast.
 
 ---
 
 ### 9.5 Scheduler → RabbitMQ
 
-Quand un job est prêt, le Scheduler publie un message `JobRunRequested`.
+Quand un job est prêt, le Scheduler publie un ordre autonome
+`JobRunRequested`. Il résout les données nécessaires avant publication :
+le Worker ne peut pas les relire dans PostgreSQL.
 
 ```json
 {
   "run_id": "uuid",
-  "job_run_id": "uuid"
+  "job_run_id": "uuid",
+  "worker_id": "uuid",
+  "attempt": 1,
+  "repository": { "url": "https://git.example.com/org/repo.git", "commit_sha": "sha" },
+  "job": {
+    "image": "node:22",
+    "timeout_seconds": 3600,
+    "steps": [ { "index": 0, "run": "npm run build" } ]
+  },
+  "log_key": "runs/{run_id}/jobs/{job_run_id}/logs.txt"
 }
 ```
+
+La V0 n'a ni artefacts amont ni réservation multi-worker. Le contrat
+contient néanmoins l'image, les steps, le SHA et la clé du log ; aucun
+de ces champs ne dépend d'une lecture de base par le Worker.
 
 ---
 
@@ -426,14 +441,27 @@ Règles V0 recommandées :
 - messages persistants
 - ack manuel
 - retry limité
+- retry automatique uniquement avant l'autorisation de démarrer ; après perte du Worker autorisé sans résultat confirmé, `indeterminate` et vérification humaine avant relance
 - dead-letter queue pour erreurs techniques
 ```
+
+Le Worker publie `job.start.requested` puis attend l'autorisation du Scheduler
+avant de lancer Docker. Il acquitte `JobRunRequested` après confirmation
+par RabbitMQ de `job.finished` ; un refus de démarrage est acquitté sans
+exécution. Aucun registre de déduplication ni spool durable n'est tenu
+sur le Worker.
+
+La V0 ne possède pas l'option YAML v2 `retry.worker_loss`. Si le
+Worker disparaît après l'autorisation sans résultat confirmé, le
+Scheduler passe le job et le run à `indeterminate` et bloque les jobs
+dépendants. Un `job.finished` tardif authentifié peut résoudre cet état.
+Le Scheduler ne relance pas automatiquement cette tentative.
 
 ---
 
 ### 9.7 Worker → Scheduler
 
-Le Worker n'accède pas à PostgreSQL ([ADR-0001](../../../decisions/ADR-0001-worker-scheduler-communication.md)). Il signale au Scheduler, via RabbitMQ, le début et la fin de chaque job. Le Scheduler écrit les statuts, les codes de retour et la référence du fichier de logs, puis publie les jobs suivants.
+Le Worker n'accède pas à PostgreSQL ([ADR-0001](../../../decisions/ADR-0001-worker-scheduler-communication.md)). Il envoie `job.start.requested` (`job_run_id`, `attempt`, `start_request_id`) au Scheduler via RabbitMQ. Le Scheduler valide la tentative, écrit `running` et conserve le `start_request_id`, puis renvoie `job.start.accepted` avec ce même ID. Une retransmission de la même demande encore active reçoit à nouveau l'acceptation ; une demande différente ou périmée reçoit `job.start.rejected`. Le Worker n'exécute le job qu'après acceptation correspondante. Il envoie ensuite `job.finished` (`job_run_id`, `attempt`, statut, code de retour, horodatages, `log_key`). Le Scheduler valide et écrit le résultat, puis publie les jobs suivants. Les événements confirmés restent dans une file durable jusqu'à l'ACK du Scheduler après commit.
 
 ---
 
@@ -753,6 +781,7 @@ running
 success
 failed
 skipped
+indeterminate
 canceled
 ```
 
@@ -793,7 +822,11 @@ sequenceDiagram
   Scheduler->>MQ: Publie JobRunRequested(build)
 
   Worker->>MQ: Consomme JobRunRequested(build)
+  Worker->>Docker: Vérifie la disponibilité du démon (sans exécuter le dépôt)
   Worker->>MQ: Signale build démarré
+  Scheduler->>PG: Valide la tentative et marque build running
+  Scheduler->>MQ: Publie job.start.accepted(build)
+  MQ->>Worker: Livre job.start.accepted(build)
   Worker->>Git: Clone repo au SHA
   Worker->>Docker: Pull image node:22
   Worker->>Docker: Create/start container
@@ -808,7 +841,11 @@ sequenceDiagram
   Scheduler->>MQ: Publie JobRunRequested(test)
 
   Worker->>MQ: Consomme JobRunRequested(test)
+  Worker->>Docker: Vérifie la disponibilité du démon (sans exécuter le dépôt)
   Worker->>MQ: Signale test démarré
+  Scheduler->>PG: Valide la tentative et marque test running
+  Scheduler->>MQ: Publie job.start.accepted(test)
+  MQ->>Worker: Livre job.start.accepted(test)
   Worker->>Docker: Create/start container
   Docker->>Job: Exécute npm test
   Worker->>FS: Écrit logs test
@@ -911,7 +948,8 @@ services:
   worker:
     image: rustkins/worker:dev
     environment:
-      RABBITMQ_URL: amqp://rustkins:rustkins@rabbitmq:5672
+      WORKER_ID: ${WORKER_V0_ID}
+      RABBITMQ_URL: ${RABBITMQ_WORKER_V0_URL}
       RUSTFS_ENDPOINT: http://rustfs:9000
       RUSTFS_ACCESS_KEY: rustkins
       RUSTFS_SECRET_KEY: rustkins-password
@@ -923,7 +961,7 @@ services:
       - rabbitmq
       - rustfs
     networks:
-      - rustkins-private
+      - rustkins-worker
 
   postgres:
     image: postgres:16
@@ -947,6 +985,7 @@ services:
       - rabbitmq_data:/var/lib/rabbitmq
     networks:
       - rustkins-private
+      - rustkins-worker
 
   rustfs:
     image: rustfs/rustfs:latest
@@ -960,6 +999,7 @@ services:
       - rustfs_data:/data
     networks:
       - rustkins-private
+      - rustkins-worker
 
 volumes:
   postgres_data:
@@ -970,13 +1010,21 @@ volumes:
 networks:
   rustkins-public:
   rustkins-private:
+  rustkins-worker:
 ```
+
+Le réseau du Worker donne accès à RabbitMQ et RustFS, sans route directe
+vers PostgreSQL. Sur cet hôte unique, le socket Docker monté dans le
+Worker peut toutefois contourner cette séparation : cette configuration
+sert au développement local, pas à une garantie d'isolation forte.
+`RABBITMQ_WORKER_V0_URL` utilise un compte propre au Worker, provisionné
+avec les droits définis dans [ARCH-02 §9](../../architecture/components/messaging/02-rabbitmq-architecture.md#9-worker-events).
 
 ---
 
-## 15. Exemple Swarm mono-node pour prod V0
+## 15. Exemple Swarm mono-node pour le pilote V0
 
-La prod V0 peut être déployée sur une VM unique avec Docker Swarm initialisé en mono-node.
+Le pilote V0 peut être déployé sur une VM unique avec Docker Swarm initialisé en mono-node. Ce montage ne convient pas à une production exécutant du code de dépôt non fiable : le Worker partage l'hôte Docker du plan de contrôle. Une telle production exige des hôtes distincts.
 
 ```bash
 docker swarm init
@@ -1064,7 +1112,8 @@ services:
   worker:
     image: rustkins/worker:v0
     environment:
-      RABBITMQ_URL: amqp://rustkins:rustkins@rabbitmq:5672
+      WORKER_ID: ${WORKER_V0_ID}
+      RABBITMQ_URL: ${RABBITMQ_WORKER_V0_URL}
       RUSTFS_ENDPOINT: http://rustfs:9000
       RUSTFS_ACCESS_KEY: rustkins
       RUSTFS_SECRET_KEY: rustkins-password
@@ -1073,7 +1122,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - worker_workdir:/workdir
     networks:
-      - private
+      - workers
     deploy:
       replicas: 1
       placement:
@@ -1110,6 +1159,7 @@ services:
       - rabbitmq_data:/var/lib/rabbitmq
     networks:
       - private
+      - workers
     deploy:
       replicas: 1
       placement:
@@ -1131,6 +1181,7 @@ services:
       - rustfs_data:/data
     networks:
       - private
+      - workers
     deploy:
       replicas: 1
       placement:
@@ -1148,7 +1199,13 @@ networks:
     driver: overlay
   private:
     driver: overlay
+  workers:
+    driver: overlay
 ```
+
+En V0 mono-node, ce réseau sépare les conteneurs mais le socket Docker
+du Worker garde les privilèges du démon de l'hôte. L'isolation forte du
+plan de contrôle exige des hôtes distincts.
 
 Déploiement :
 
@@ -1158,7 +1215,7 @@ docker stack deploy -c stack.v0.yml rustkins
 
 ---
 
-## 16. Différence Compose dev / Swarm prod V0
+## 16. Différence Compose dev / Swarm pilote V0
 
 | Sujet | Compose dev | Swarm mono-node V0 |
 |---|---|---|
