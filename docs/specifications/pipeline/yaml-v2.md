@@ -477,6 +477,14 @@ jobs:
       - run: ./publish.sh
 ```
 
+La frontière est l'enregistrement durable par le Scheduler de
+l'autorisation de démarrer et du `start_request_id` associé à
+`job.start.requested`, même si le Worker attend encore la réponse
+`job.start.accepted`.
+`job.start.rejected` n'autorise aucune exécution. Une retransmission de la
+même demande sur la tentative encore active reprend l'acceptation, sans
+créer de nouvelle tentative.
+
 `retry.worker_loss` accepte `never` (valeur par défaut) ou `unsafe`.
 Avec `never`, le job et le pipeline passent `indeterminate` : aucun descendant
 ne démarre, y compris avec `run_if: always`. Un résultat tardif authentifié

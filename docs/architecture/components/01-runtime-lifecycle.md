@@ -270,8 +270,9 @@ outbox.
 
 ### running
 
-The Worker received the job and published `job.start.requested`; the
-Scheduler persisted the state.
+The Scheduler committed start authorization for the assigned attempt:
+`running`, its `start_request_id` and the `job.start.accepted` outbox
+message. The Worker may still be waiting for that response.
 
 ### success
 
@@ -486,10 +487,12 @@ The Scheduler validates every Worker event against the JobRun state.
 
 Rules
 
--   already success -\> ignore the event
--   already failed -\> ignore the event
--   already cancelled -\> ignore the event
--   already running or stale attempt -\> reject the start request
+-   duplicate or stale result event -\> ignore and ACK
+-   current running attempt with the same `start_request_id` -\> replay
+    `job.start.accepted` without authorizing a second execution
+-   current running attempt with a different `start_request_id`, or a
+    stale attempt -\> send `job.start.rejected`
+-   terminal attempt -\> send `job.start.rejected` for any start request
 
 ------------------------------------------------------------------------
 

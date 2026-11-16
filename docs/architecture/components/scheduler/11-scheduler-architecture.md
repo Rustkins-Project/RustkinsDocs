@@ -232,21 +232,23 @@ The Scheduler, in one transaction:
 5.  completes the PipelineRun, schedules a retry or marks the JobRun
     `dead_lettered` when applicable.
 
-The event is acknowledged after commit. Duplicate or stale events are
-ignored.
+The event is acknowledged after commit. Duplicate or stale result events
+are ignored; start requests receive a correlated response instead.
 
-`job.start.requested` and `step.finished` events are handled the same way and
-update JobRun `running` and StepRun states.
+`step.finished` updates StepRun state. `job.start.requested` follows the
+authorization protocol below.
 
 For `job.start.requested`, the Scheduler first verifies the RabbitMQ-validated
 `user_id`, the assigned Worker and the attempt. In one transaction it
 moves a `queued` attempt to `running`, stores its `start_request_id` and
 inserts an OutboxMessage for `job.start.accepted`. A retransmission
 with the same request ID on the still-current running attempt receives
-another acceptance, without authorizing execution twice. A different
-or stale request receives `job.start.rejected`. Both responses copy
+another acceptance through the outbox, without authorizing execution
+twice. A different or stale request receives `job.start.rejected` through
+the outbox. Both responses copy
 the request's `start_request_id` so the Worker can match the response
-to its pending delivery.
+to its pending delivery. The Scheduler ACKs the request only after the
+response is persisted.
 The Worker starts Docker only after receiving acceptance. This durable
 authorization replaces a local Worker deduplication registry; each
 attempt can be authorized once. If the Worker disappears after

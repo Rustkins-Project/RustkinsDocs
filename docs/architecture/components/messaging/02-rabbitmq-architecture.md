@@ -302,10 +302,12 @@ not yet specify image download metrics or Worker-wide utilization.
 
 Rules:
 
--   `job.start.requested` carries a fresh `start_request_id`; the Scheduler
-    stores it on the attempt and copies it into `job.start.accepted` or
-    `job.start.rejected`. Retransmission of the same request uses the
-    same ID.
+-   `job.start.requested` carries a fresh `start_request_id` for each
+    `job.assigned` delivery; retransmission of that request reuses the
+    same ID. The Scheduler stores the accepted ID on the attempt and
+    copies the requested ID into `job.start.accepted` or
+    `job.start.rejected`. A same-ID request on the current running attempt
+    replays acceptance; a different or stale request is rejected.
 -   Workers publish with publisher confirms.
 -   A live Worker retains an unconfirmed `job.finished` in memory and
     retries publication. Once confirmed, RabbitMQ holds the persistent
@@ -318,7 +320,10 @@ Rules:
     within the global limit.
 -   The Scheduler validates the sender, the attempt and the state
     transition, writes the state, then ACKs the event after commit.
--   Duplicate or stale events are ignored and acknowledged.
+-   Duplicate or stale result events are ignored and acknowledged.
+    Start requests receive `job.start.accepted` or `job.start.rejected`
+    according to the attempt state and request ID, then are acknowledged
+    after the response is persisted.
 
 ------------------------------------------------------------------------
 

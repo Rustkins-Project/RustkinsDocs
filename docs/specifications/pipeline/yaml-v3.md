@@ -910,7 +910,10 @@ jobs:
 La version 3 conserve `retry.worker_loss` de la
 [spécification v2](yaml-v2.md#102-relance-après-perte-du-worker) : `never`
 par défaut ou `unsafe` sur choix explicite du job. Cette option ne
-concerne que la perte d'un Worker déjà autorisé sans résultat confirmé.
+concerne que la perte d'un Worker après l'enregistrement durable de
+l'autorisation de démarrer, même si `job.start.accepted` n'a pas encore
+été livré, sans résultat confirmé. `job.start.rejected` ne déclenche
+aucune exécution.
 
 ### Nom affiché
 
@@ -2753,7 +2756,7 @@ La spécification v3 est considérée correctement implémentée si :
 56. Les valeurs `matrix`, `inputs` et `vars` sont interpolées.
 57. Les expressions libres sont rejetées.
 58. Les jobs de déploiement Kubernetes et Swarm peuvent être réalisés avec des CLI ordinaires.
-59. La politique `retry.worker_loss` héritée de v2 garde `never` par défaut et n'autorise la relance d'un Worker perdu après démarrage qu'avec `unsafe` explicite.
+59. La politique `retry.worker_loss` héritée de v2 garde `never` par défaut et n'autorise la relance d'un Worker perdu après autorisation durable du démarrage qu'avec `unsafe` explicite.
 
 ---
 
