@@ -327,3 +327,26 @@ def test_cli_exit_codes(repo):
     write(repo, body="# Document\n\n[lien](missing.md)\n")
     bad = subprocess.run(command, text=True, capture_output=True)
     assert bad.returncode != 0 and "cible locale introuvable" in bad.stdout
+
+
+def test_pre_commit_uses_same_local_checks_as_ci():
+    """Les hooks bloquent le commit via les mêmes commandes que la CI, sur tout le dépôt."""
+    configuration = yaml.safe_load((REPO / ".pre-commit-config.yaml").read_text(encoding="utf-8"))
+    assert configuration["fail_fast"] is True
+    assert len(configuration["repos"]) == 1
+    assert configuration["repos"][0]["repo"] == "local"
+    hooks = configuration["repos"][0]["hooks"]
+    expected_commands = {"python -m pytest -q", "python scripts/validate_docs.py"}
+    assert {hook["entry"] for hook in hooks} == expected_commands
+
+    dependencies = [line.strip() for line in (REPO / "requirements.txt").read_text(encoding="utf-8").splitlines() if line.strip() and not line.startswith("#")]
+    for hook in hooks:
+        assert hook["language"] == "python"
+        assert hook["additional_dependencies"] == dependencies
+        assert hook["always_run"] is True
+        assert hook["pass_filenames"] is False
+        assert hook["stages"] == ["pre-commit"]
+
+    workflow = yaml.safe_load((REPO / ".github/workflows/docs-validation.yml").read_text(encoding="utf-8"))
+    runs = [str(step.get("run", "")) for step in workflow["jobs"]["docs-validation"]["steps"]]
+    assert all(any(command in run for run in runs) for command in expected_commands)
