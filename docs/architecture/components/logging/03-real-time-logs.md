@@ -105,6 +105,7 @@ Docker->>Worker: stdout/stderr
 Worker->>RustFS: append log
 Worker->>MQ: publish chunk
 MQ->>API: chunk
+API->>API: validate Worker identity and JobRun assignment
 API->>Browser: SSE event
 
 Browser->>API: reconnect
@@ -143,6 +144,9 @@ Contains
 -   last_sequence
 -   timestamps
 
+Written by the Scheduler from the `job.finished` event of the Worker
+(log key, size). Workers never access PostgreSQL.
+
 ## LOG_EVENT
 
 Runtime representation
@@ -164,6 +168,7 @@ It represents the structure exchanged through RabbitMQ and SSE.
 
 ``` json
 {
+  "worker_id":"uuid",
   "job_run_id":"uuid",
   "sequence":15,
   "stream":"stdout",
@@ -171,6 +176,12 @@ It represents the structure exchanged through RabbitMQ and SSE.
   "timestamp":"2026-01-01T12:00:00Z"
 }
 ```
+
+RabbitMQ validates the publisher's AMQP `user_id`. The API compares it
+with the account mapped to `worker_id` and the Worker assigned to the
+JobRun before streaming the chunk. The routing key is
+`logs.{worker_id}.{job_run_id}`; per-Worker topic permissions reject
+another Worker's prefix.
 
 Maximum chunk size
 
@@ -271,7 +282,11 @@ Live updates temporarily unavailable.
 
 ## Worker crash
 
-Current JobRun ends.
+The Scheduler applies the start-authorization retry policy. After an
+authorized Worker loss without a confirmed result, the JobRun is
+`indeterminate` by default; with YAML v2 `retry.worker_loss: unsafe`,
+the Scheduler may create a new attempt. Logs already written remain
+associated with the original attempt.
 
 Logs already stored in RustFS remain available.
 

@@ -78,20 +78,25 @@ PipelineVersion --> Scheduler
 Scheduler --> PostgreSQL
 PostgreSQL --> OutboxPublisher
 OutboxPublisher --> RabbitMQ
-RabbitMQ --> Worker
+RabbitMQ -->|job.assigned| Worker
 Worker --> Docker
 Docker --> RustFS
-Worker --> PostgreSQL
+Worker -->|events| RabbitMQ
+RabbitMQ -->|events| Scheduler
 ```
+
+Workers never access PostgreSQL. They receive self-contained execution
+orders and report events to the Scheduler, which is the only writer of
+runtime state ([ADR-0001](../../../decisions/ADR-0001-worker-scheduler-communication.md)).
 
 Responsibilities:
 
   Component    Responsibility
   ------------ -----------------------------------------
   API          Receive requests and webhooks
-  Scheduler    Build execution graph and dispatch jobs
+  Scheduler    Build execution graph, dispatch jobs, persist Worker events
   OutboxPublisher Publish durable outbox messages to RabbitMQ
-  Worker       Execute Docker containers
+  Worker       Execute Docker containers and report events
   PostgreSQL   Source of truth
   RabbitMQ     Transport layer
   RustFS       Persistent storage
@@ -134,6 +139,7 @@ A PipelineVersion may be executed many times.
   warning     No mandatory failure occurred, but at least one job ended in warning
   failed      Mandatory execution failed
   cancelled   Execution cancelled
+  indeterminate  An authorized job lost its result; execution is suspended for review
 
 State machine
 
@@ -146,6 +152,9 @@ running --> success
 running --> warning
 running --> failed
 running --> cancelled
+running --> indeterminate
+running --> retrying
+indeterminate --> running
 ```
 
 Transition rules
@@ -165,6 +174,7 @@ Conditions
 -   no JobRun = warning
 -   no failed mandatory jobs
 -   no dead_lettered jobs
+-   no indeterminate jobs
 -   skipped jobs are only skipped because their `run_if` condition was not satisfied
 
 ### running → warning
@@ -181,11 +191,17 @@ Conditions
 
 -   mandatory job failed
 -   dead_lettered reached
--   cancellation timeout
 
 ### running → cancelled
 
 User explicitly cancelled execution.
+
+### running → indeterminate
+
+A Worker disappeared or cancellation timed out after start
+authorization without a confirmed final event. The Scheduler does not retry that job or unlock its
+dependents. A late authenticated result from the same attempt, or
+operator reconciliation, can resume the PipelineRun.
 
 ------------------------------------------------------------------------
 
@@ -206,6 +222,7 @@ cancel_requested
 cancelled
 retrying
 dead_lettered
+indeterminate
 ```
 
 ``` mermaid
@@ -215,16 +232,21 @@ waiting_dependencies --> waiting_resources
 waiting_dependencies --> queued
 waiting_resources --> queued
 queued --> running
+queued --> retrying
 queued --> cancelled
 running --> success
 running --> warning
 running --> failed
-running --> retrying
+running --> indeterminate
 running --> cancel_requested
 cancel_requested --> cancelled
-cancel_requested --> failed
+cancel_requested --> indeterminate
 retrying --> queued
 retrying --> dead_lettered
+indeterminate --> success
+indeterminate --> warning
+indeterminate --> failed
+indeterminate --> cancelled
 ```
 
 Detailed description
@@ -248,7 +270,9 @@ outbox.
 
 ### running
 
-Worker acknowledged message. Container started.
+The Scheduler committed start authorization for the assigned attempt:
+`running`, its `start_request_id` and the `job.start.accepted` outbox
+message. The Worker may still be waiting for that response.
 
 ### success
 
@@ -277,7 +301,9 @@ Examples
 If the JobRun is optional, a business failure produces `warning`
 instead of `failed`.
 
-Infrastructure failures still follow the retry policy.
+Infrastructure failures follow the default automatic retry policy only
+when no start authorization was committed. An authorized Worker loss
+may be retried only with YAML v2 `retry.worker_loss: unsafe`.
 
 ### retrying
 
@@ -285,7 +311,19 @@ Infrastructure failure.
 
 ### dead_lettered
 
-Maximum retries exceeded.
+Maximum retries before start authorization exceeded. An authorized
+Worker loss without a confirmed result remains `indeterminate` if the
+attempt limit is exhausted, even with `retry.worker_loss: unsafe`.
+
+### indeterminate
+
+Start was authorized, but the result is unknown after Worker loss or
+cancellation timeout. By default no retry is dispatched. A late result
+from the original attempt can settle the state; otherwise an operator
+must check external effects before any new execution is considered.
+With YAML v2 `retry.worker_loss: unsafe`, only Worker loss permits
+another attempt; the original attempt remains `indeterminate` in the
+audit history.
 
 ------------------------------------------------------------------------
 
@@ -325,13 +363,15 @@ A PipelineRun becomes `warning` when:
 -   at least one JobRun is `warning`
 -   no mandatory JobRun is `failed`
 -   no JobRun is `dead_lettered`
+-   no JobRun is `indeterminate`
 
 ## Dependency evaluation
 
 For `run_if`:
 
 -   `all_success` accepts dependencies in `success` or `warning`
--   `always` accepts dependencies in any final state
+-   `always` accepts dependencies in any known final state;
+    `indeterminate` blocks it
 -   `on_failure` only matches dependencies in `failed` or `dead_lettered`
 
 ------------------------------------------------------------------------
@@ -370,15 +410,20 @@ Attempt 2 -> 2 min
 Attempt 3 -> 5 min
 ```
 
-Retry only infrastructure failures.
+Retry infrastructure failures automatically by default only when start
+was never authorized. A lost result after authorization becomes
+`indeterminate` even when attempts remain. YAML v2
+`retry.worker_loss: unsafe` explicitly permits a new attempt after
+authorized Worker loss, up to the global three-attempt limit. The old
+attempt stays `indeterminate` in the audit history; a late result
+cannot overwrite the new attempt. External effects may repeat.
 
 Retryable examples
 
--   Docker daemon unavailable
--   RustFS unavailable
--   RabbitMQ connection lost
--   PostgreSQL timeout
--   Worker crash
+-   Docker daemon unavailable during preflight
+-   RabbitMQ connection lost before authorization
+-   PostgreSQL timeout before authorization
+-   Worker crash before start authorization
 
 Non retryable
 
@@ -386,6 +431,8 @@ Non retryable
 -   Exit code != 0
 -   YAML validation
 -   Build failed
+-   Worker loss after start authorization with no confirmed result,
+    unless the job explicitly sets `retry.worker_loss: unsafe`
 
 State transition
 
@@ -408,15 +455,19 @@ Queued jobs
 Running jobs
 
 1.  status = cancel_requested
-2.  create cancel OutboxMessage
+2.  create cancel OutboxMessage routed to the assigned Worker's control
+    queue; for a run-wide cancellation, target each Worker with an
+    active job in that run
 3.  worker stops container
-4.  worker confirms cancellation
+4.  worker confirms with `job.finished` (status `cancelled`)
 5.  scheduler releases resources
 6.  status = cancelled
 
 If worker disappears
 
-status becomes failed.
+If start was authorized and no final result was confirmed, the JobRun
+and PipelineRun become `indeterminate`. No automatic retry follows a
+cancellation timeout. A late authenticated result can resolve it.
 
 ------------------------------------------------------------------------
 
@@ -424,16 +475,24 @@ status becomes failed.
 
 RabbitMQ provides at-least-once delivery.
 
-Workers must therefore validate JobRun before execution.
+Workers publish `job.start.requested` and wait for `job.start.accepted` before
+launching Docker. The Scheduler atomically authorizes only the first
+valid request for the assigned `job_run_id:attempt` and stores its
+`start_request_id`. Retransmissions of that same request while the
+attempt is current and running receive the same acceptance. A distinct
+or stale request receives `job.start.rejected` and is ACKed without
+execution. Workers keep no durable deduplication registry.
+
+The Scheduler validates every Worker event against the JobRun state.
 
 Rules
 
--   already success -\> ignore
--   already failed -\> ignore
--   already cancelled -\> ignore
--   already running elsewhere -\> ignore
-
-Duplicate messages are ACKed without execution.
+-   duplicate or stale result event -\> ignore and ACK
+-   current running attempt with the same `start_request_id` -\> replay
+    `job.start.accepted` without authorizing a second execution
+-   current running attempt with a different `start_request_id`, or a
+    stale attempt -\> send `job.start.rejected`
+-   terminal attempt -\> send `job.start.rejected` for any start request
 
 ------------------------------------------------------------------------
 
@@ -459,6 +518,10 @@ Job events
 -   job_cancelled
 -   job_dead_lettered
 
+`job_started` is a persisted audit event for the actual execution
+start, after `job.start.accepted`. It is distinct from the RabbitMQ
+`job.start.requested` authorization request.
+
 Storage events
 
 -   artifact_uploaded
@@ -480,14 +543,19 @@ participant Docker
 API->>Scheduler: Create PipelineRun
 Scheduler->>Scheduler: Build DAG
 Scheduler->>Scheduler: Reserve resources
-Scheduler->>Scheduler: Insert OutboxMessage(job.ready)
+Scheduler->>Scheduler: Insert OutboxMessage(job.assigned)
 OutboxPublisher->>RabbitMQ: Publish outbox message
-RabbitMQ->>Worker: Job message
+RabbitMQ->>Worker: job.assigned
+Worker->>RabbitMQ: job.start.requested
+RabbitMQ->>Scheduler: job.start.requested
+Scheduler->>Scheduler: Persist running + outbox(job.start.accepted)
+RabbitMQ->>Worker: job.start.accepted
 Worker->>Docker: Start container
 Docker-->>Worker: Exit code
-Worker->>Scheduler: Update JobRun
-Scheduler->>Scheduler: Release resources
-Scheduler->>Scheduler: Unlock dependent jobs
+Worker->>RabbitMQ: job.finished
+RabbitMQ->>Scheduler: job.finished
+Scheduler->>Scheduler: Persist state, release resources
+Scheduler->>Scheduler: Unlock dependent jobs, assign next jobs
 ```
 
 ------------------------------------------------------------------------
@@ -502,8 +570,12 @@ The following rules MUST always remain true.
 -   One StepRun belongs to exactly one JobRun.
 -   Scheduler is the only component allowed to enqueue jobs.
 -   Scheduler is the only component allowed to reserve or release worker capacity.
--   Every runtime RabbitMQ message is first persisted as an OutboxMessage.
+-   Scheduler orders and control messages are persisted as
+    OutboxMessages before publication; Worker events and live log
+    chunks are published with broker confirmations.
 -   Workers never modify DAG topology.
+-   Workers never access PostgreSQL; the Scheduler is the only writer
+    of runtime execution state.
 -   A completed JobRun never returns to running.
 -   Dead-lettered jobs require manual retry.
 -   PostgreSQL is the single source of truth.
@@ -532,7 +604,8 @@ Scheduler owns execution ordering.
 
 Consequence
 
-Workers remain stateless executors.
+Workers keep only in-memory state for active jobs; PostgreSQL and
+RabbitMQ hold the durable execution state.
 
 ------------------------------------------------------------------------
 

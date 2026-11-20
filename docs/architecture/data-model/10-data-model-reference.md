@@ -216,6 +216,7 @@ Contains immutable execution definition:
 -   timeout
 -   run_if
 -   optional
+-   retry_worker_loss (`never` or `unsafe`, default `never`)
 
 `optional = true` means that business failures on this job produce a
 JobRun `warning` instead of a PipelineRun-blocking `failed`.
@@ -283,6 +284,9 @@ Examples
 -   exit code
 -   timestamps
 
+Written only by the Scheduler, including from Worker events
+(`job.start.requested`, `step.finished`, `job.finished`).
+
 `warning` is a final non-blocking status used when a job completed with
 non-blocking issues.
 
@@ -304,6 +308,28 @@ One retry attempt.
 Purpose
 
 Keep retry history independently from JobRun.
+
+`start_request_id` is null before authorization and then stores the
+start request accepted by the Scheduler. Retransmitting that same
+request can replay the
+acceptance without granting a second authorization.
+
+When an authorized Worker is lost without a confirmed result, the
+attempt is `indeterminate`. With YAML v2 `retry.worker_loss: unsafe`,
+a new attempt may start while this record remains available for audit.
+A late result from the older attempt cannot change the current one.
+
+The Scheduler records `cpu_seconds` and `memory_peak_mb` from the
+validated `job.finished` event on this attempt. `cpu_seconds` is the
+container CPU time, not wall-clock duration; `memory_peak_mb` is the
+highest observed container memory use. Wall-clock duration is derived
+from `started_at` and `finished_at`. A missing measurement remains
+`null`, for example after Worker loss, rather than being recorded as
+zero. These fields do not estimate energy or CO2e.
+
+Per-Worker utilization, image download time and size, and storage
+volumes are not part of this V1 contract. Their collection and export
+still require a separate specification.
 
 ------------------------------------------------------------------------
 
@@ -337,6 +363,9 @@ cancelled
 ```
 
 Used for audit and diagnostics.
+
+`job_started` records actual execution after authorization; the AMQP
+request sent beforehand is named `job.start.requested`.
 
 ------------------------------------------------------------------------
 
@@ -394,6 +423,10 @@ Stores
 -   status
 
 Scheduler is the only component allowed to reserve and release capacity.
+
+Created and updated by the Scheduler from `worker.registered` and
+`worker.heartbeat` events. Workers never access PostgreSQL
+([ADR-0001](../../../decisions/ADR-0001-worker-scheduler-communication.md)).
 
 ------------------------------------------------------------------------
 
@@ -478,7 +511,9 @@ LOG_EVENT
 -   Every StepRun references exactly one PipelineVersionStep.
 -   Every Artifact belongs to one JobRun.
 -   Every Worker executes many JobRuns over time.
--   Every runtime RabbitMQ message is first persisted as an OutboxMessage.
+-   Scheduler orders and control messages are persisted as
+    OutboxMessages before publication. Worker events and log chunks
+    are published with RabbitMQ confirmations instead.
 -   Pipeline definitions never depend on runtime entities.
 
 ------------------------------------------------------------------------

@@ -6,6 +6,7 @@ status: draft
 summary: "Périmètre de Rustkins V1 : usage en équipe, authentification, webhooks, scheduling, logs temps réel et artéfacts."
 topics: [V1, teams, webhooks, scheduling]
 applies_to: [V1]
+related_adrs: [ADR-0001]
 ---
 
 # Rustkins — Récapitulatif détaillé V1
@@ -126,6 +127,7 @@ La V1 ne cherche pas encore à couvrir les usages CI/CD complexes de production.
 - Jobs optionnels avec `optional`.
 - Steps non bloquantes avec `continue_on_error`.
 - Politique d'exécution `run_if`.
+- Politique de relance par job `retry.worker_loss` (`never` par défaut, `unsafe` sur choix explicite).
 - Valeurs `run_if` : `all_success`, `always`, `on_failure`.
 - Normalisation du YAML vers un modèle interne complet.
 - Création de `PipelineVersion` immuables.
@@ -134,16 +136,16 @@ La V1 ne cherche pas encore à couvrir les usages CI/CD complexes de production.
 #### Exécution
 
 - Support de plusieurs workers.
-- Workers stateless.
+- Workers sans état d'exécution durable local : PostgreSQL et RabbitMQ portent la reprise.
 - Scheduling centralisé.
 - Réservation CPU/RAM avant dispatch.
 - Limites Docker CPU/RAM appliquées aux conteneurs.
 - État `waiting_resources`.
 - Annulation d'un run.
 - Annulation d'un job.
-- Retry limité des erreurs d'infrastructure.
+- Retry automatique avant autorisation d'exécuter ; après perte d'un Worker autorisé, uniquement sur option explicite `retry.worker_loss: unsafe` du YAML v2.
 - Dead Letter Queue.
-- Idempotence côté worker.
+- Autorisation unique de chaque tentative par le Scheduler.
 - Gestion explicite des statuts `warning`.
 - Heartbeat workers.
 - Détection des workers offline.
@@ -152,12 +154,14 @@ La V1 ne cherche pas encore à couvrir les usages CI/CD complexes de production.
 
 - RabbitMQ utilisé comme transport uniquement.
 - PostgreSQL reste la source de vérité.
-- Transactional outbox pour les messages runtime.
+- Transactional outbox pour les ordres et contrôles émis par le Scheduler ; événements des workers publiés avec confirmation RabbitMQ.
 - Outbox Publisher côté Scheduler.
-- Messages RabbitMQ légers, contenant uniquement des identifiants.
+- Ordres d'exécution autonomes envoyés par le Scheduler dans la file propre à chaque worker.
+- Événements des workers (`job.start.requested`, `step.finished`, `job.finished`, heartbeat) envoyés au Scheduler, seul à écrire l'état en base.
+- Workers sans accès à PostgreSQL ([ADR-0001](../../../decisions/ADR-0001-worker-scheduler-communication.md)).
 - ACK manuel côté worker.
-- Retry uniquement pour les erreurs d'infrastructure.
-- Déduplication des messages côté worker.
+- Aucun retry automatique par défaut d'un job autorisé dont l'issue est inconnue ; l'option `unsafe` accepte explicitement le risque de répétition des effets externes.
+- Autorisation unique d'une tentative par le Scheduler avant l'exécution Docker.
 
 #### Logs
 
@@ -238,6 +242,7 @@ La V1 ne cherche pas encore à couvrir les usages CI/CD complexes de production.
 | Git events | `push` uniquement |
 | Source de vérité runtime | PostgreSQL |
 | Transport async | RabbitMQ |
+| Communication Scheduler ↔ Workers | RabbitMQ uniquement ; les workers n'accèdent pas à PostgreSQL ([ADR-0001](../../../decisions/ADR-0001-worker-scheduler-communication.md)) |
 | Publication RabbitMQ | Transactional outbox |
 | Outbox Publisher | Sous-composant du Scheduler |
 | Logs temps réel | SSE |
@@ -249,7 +254,7 @@ La V1 ne cherche pas encore à couvrir les usages CI/CD complexes de production.
 | Scheduling | Centralisé dans le Scheduler |
 | Ressources | CPU milliCPU + mémoire MB |
 | Sélection worker | Premier worker compatible |
-| Retry | Erreurs d'infrastructure uniquement |
+| Retry | Erreurs d'infrastructure avant autorisation de démarrer ; après perte d'un Worker autorisé : `indeterminate` par défaut, relance seulement avec `retry.worker_loss: unsafe` dans le YAML v2 |
 | Tentatives max | 3 |
 | Déploiement dev | Docker Compose |
 | Déploiement cible | Docker Swarm distribué simple |
@@ -285,17 +290,14 @@ flowchart TD
   MQ --> Worker2[Worker 2]
   MQ --> WorkerN[Worker N]
 
-  Worker1 --> PG
   Worker1 --> FS
   Worker1 --> Git[Git externe]
   Worker1 --> Docker1[Docker Engine worker 1]
 
-  Worker2 --> PG
   Worker2 --> FS
   Worker2 --> Git
   Worker2 --> Docker2[Docker Engine worker 2]
 
-  WorkerN --> PG
   WorkerN --> FS
   WorkerN --> Git
   WorkerN --> DockerN[Docker Engine worker N]
@@ -304,9 +306,10 @@ flowchart TD
   Docker2 --> JobContainer2[Conteneur job]
   DockerN --> JobContainerN[Conteneur job]
 
-  Worker1 -->|log chunks| MQ
-  Worker2 -->|log chunks| MQ
-  WorkerN -->|log chunks| MQ
+  Worker1 -->|événements + log chunks| MQ
+  Worker2 -->|événements + log chunks| MQ
+  WorkerN -->|événements + log chunks| MQ
+  MQ -->|rustkins.events| Scheduler
   MQ -->|rustkins.logs| API
 
   PG --> PGVolume[(Volume postgres_data)]
@@ -377,13 +380,16 @@ flowchart TD
   Scheduler --> MQ
   MQ --> Worker1
   MQ --> Worker2
-  Worker1 --> PG
+  Worker1 -->|événements| MQ
+  Worker2 -->|événements| MQ
+  MQ -->|événements| Scheduler
   Worker1 --> FS
   Worker1 --> Docker1
-  Worker2 --> PG
   Worker2 --> FS
   Worker2 --> Docker2
 ```
+
+Les conteneurs workers n'ont **aucune route directe vers PostgreSQL** : ils joignent RabbitMQ, RustFS, Git et leur Docker Engine local. Le socket Docker peut contourner cette séparation sur un hôte partagé ; en production, les workers résident sur des hôtes distincts du plan de contrôle (§19.1).
 
 ---
 
@@ -463,13 +469,14 @@ En V1, les workers peuvent être distribués sur plusieurs nodes.
 Ils doivent pouvoir accéder à :
 
 ```txt
-- PostgreSQL
 - RabbitMQ
 - RustFS
 - Git externe
 - Docker Engine local
 - Internet sortant pour les containers de job
 ```
+
+Ils ne doivent **pas** accéder à PostgreSQL ([ADR-0001](../../../decisions/ADR-0001-worker-scheduler-communication.md)). Un réseau dédié aux workers, ne contenant que RabbitMQ et RustFS, matérialise cette séparation.
 
 Traefik reste connecté aux réseaux public et privé :
 
@@ -487,7 +494,7 @@ private → route vers UI/API
 | Traefik | 80 / 443 | Oui | Point d'entrée HTTP/HTTPS |
 | UI | 80 | Non direct | Accessible via Traefik |
 | API | 8080 | Non direct | Accessible via Traefik `/api` |
-| PostgreSQL | 5432 | Non public | Accessible par services internes |
+| PostgreSQL | 5432 | Non public | Accessible par l'API et le Scheduler uniquement |
 | RabbitMQ AMQP | 5672 | Non public | Accessible par Scheduler/API/Workers |
 | RabbitMQ Management | 15672 | Admin uniquement | À protéger fortement |
 | RustFS API | 9000 | Non public | Accessible par API/Workers |
@@ -587,7 +594,11 @@ Le Scheduler :
 - libère les ressources ;
 - gère les retries ;
 - marque les jobs en `dead_lettered` si nécessaire ;
-- calcule le statut final du run.
+- calcule le statut final du run ;
+- enregistre les états remontés par les workers (`JobRun`, `StepRun`, métadonnées de logs et d'artifacts, heartbeats).
+
+Le Scheduler est le **seul composant qui décide et écrit les transitions
+d'exécution**.
 
 ---
 
@@ -599,58 +610,66 @@ Il écrit d'abord un `OutboxMessage` dans PostgreSQL dans la même transaction q
 
 L'Outbox Publisher publie ensuite vers RabbitMQ.
 
-Exemple de message `job.ready` :
+Le message `job.assigned` est routé avec la clé `worker.{worker_id}` vers la file du worker sur lequel les ressources ont été réservées.
+
+C'est un **ordre d'exécution autonome** : dépôt et SHA, image, steps, `continue_on_error`, caractère optionnel du job, limites CPU/RAM, timeout, artifacts à produire et artifacts amont à restaurer. Extrait :
 
 ```json
 {
   "message_id": "uuid",
+  "type": "job.assigned",
+  "worker_id": "uuid",
   "pipeline_run_id": "uuid",
   "job_run_id": "uuid",
-  "pipeline_version_job_id": "uuid",
-  "project_id": "uuid",
   "attempt": 1,
-  "idempotency_key": "run:job",
+  "idempotency_key": "run:job:attempt",
+  "repository": { "url": "https://git.example.com/org/repo.git", "commit_sha": "sha" },
+  "job": { "image": "node:22", "steps": [ { "index": 0, "run": "npm ci", "continue_on_error": false } ] },
+  "restore_artifacts": [ { "artifact_id": "uuid", "object_key": "runs/...", "sha256": "..." } ],
   "created_at": "2026-01-01T12:00:00Z"
 }
 ```
+
+Format complet : [ARCH-02 §6](../../architecture/components/messaging/02-rabbitmq-architecture.md#6-job-message-jobassigned).
 
 ---
 
 ### 9.7 Worker → RabbitMQ
 
-Le Worker consomme les jobs prêts.
+Le Worker consomme les jobs qui lui sont assignés et publie ses événements.
 
-Queues principales :
+Files et échanges utilisés par le Worker :
 
 ```txt
-rustkins.jobs.ready.q
-rustkins.jobs.retry.q
-rustkins.jobs.dlq
-rustkins.control.cancel.q
-rustkins.logs.sse.q
+rustkins.jobs.worker.{worker_id}.q   (lecture : jobs assignés)
+rustkins.control.worker.{worker_id}.q (lecture : annulations et autorisations)
+rustkins.events                      (écriture : événements vers le Scheduler)
+rustkins.logs                        (écriture : chunks de logs)
 ```
 
 Règles :
 
-- ACK manuel ;
-- reload du `JobRun` depuis PostgreSQL avant exécution ;
-- ACK des doublons sans exécution ;
+- ACK manuel du `job.assigned`, après confirmation de `job.finished` ;
+- attente de `job.start.accepted` avant toute exécution Docker ; un `job.start.rejected` est ACK sans exécution ;
+- publication des événements avec confirmations RabbitMQ ;
+- événement non confirmé gardé en mémoire tant que le Worker vit ; la file durable RabbitMQ le conserve après confirmation, et le Scheduler acquitte après commit ;
 - publication de chunks de logs vers `rustkins.logs`.
 
 ---
 
-### 9.8 Worker → PostgreSQL
+### 9.8 Worker → Scheduler (événements)
 
-Le Worker met à jour :
+Le Worker **n'accède pas à PostgreSQL**. Il publie sur `rustkins.events` :
 
-- statut du job ;
-- statut des steps ;
-- code de retour ;
-- timestamps ;
-- tentative en cours ;
-- détails d'erreur infrastructure ;
-- metadata logs ;
-- metadata artifacts.
+| Événement | Contenu |
+|---|---|
+| `worker.registered` | identifiant, capacité CPU/RAM, version |
+| `worker.heartbeat` | identifiant, jobs en cours |
+| `job.start.requested` | job, worker, tentative, `start_request_id`, horodatage |
+| `step.finished` | statut du step, code de retour, horodatages |
+| `job.finished` | statut final, code de retour, horodatages, détail d'erreur infrastructure, clé du log, métadonnées des artifacts, consommation de ressources |
+
+Le Scheduler exige le `user_id` AMQP validé par RabbitMQ et le compare au compte du worker assigné. Pour `job.start.requested`, il inscrit `running`, conserve le `start_request_id` dans la tentative et crée l'`OutboxMessage` de `job.start.accepted` dans la même transaction. Une retransmission de la même demande sur la tentative encore active reçoit à nouveau l'acceptation via l'outbox ; une autre demande ou une tentative périmée reçoit `job.start.rejected` par le même mécanisme. La réponse reprend le `start_request_id` de la demande ; le Worker ne lance Docker qu'après avoir reçu l'acceptation correspondant à sa livraison en cours. Le Scheduler acquitte la demande après avoir enregistré sa réponse. Les autres événements sont validés, écrits en base puis acquittés après commit.
 
 Le Worker ne réserve pas et ne libère pas de ressources. Cette responsabilité reste au Scheduler.
 
@@ -697,7 +716,7 @@ stop container si annulation
 remove container
 ```
 
-Le Docker socket reste un point de vigilance majeur. Il est accepté en V1 pour garder l'exécution simple, mais il ne constitue pas une isolation forte.
+Le socket Docker donne au Worker le contrôle du démon de son hôte. En production, les workers sont sur des hôtes dédiés, séparés de PostgreSQL, de l'API et du Scheduler. Les exemples Compose sur un seul hôte sont réservés au développement local et n'offrent pas cette isolation forte.
 
 ---
 
@@ -894,6 +913,7 @@ Définition immuable d'un job parsé.
 | `image` | Image résolue |
 | `run_if` | Politique d'exécution |
 | `optional` | Job non bloquant |
+| `retry_worker_loss` | `never` par défaut, ou `unsafe` si déclaré dans le YAML v2 |
 | `cpu_limit_milli` | CPU demandé |
 | `memory_limit_mb` | Mémoire demandée |
 | `timeout_seconds` | Timeout job |
@@ -1015,6 +1035,7 @@ success
 warning
 failed
 cancelled
+indeterminate
 ```
 
 ### 11.2 `job_runs`
@@ -1032,6 +1053,7 @@ cancel_requested
 cancelled
 retrying
 dead_lettered
+indeterminate
 ```
 
 ### 11.3 `step_runs`
@@ -1042,6 +1064,7 @@ success
 warning
 failed
 skipped
+indeterminate
 ```
 
 ### 11.4 `outbox_messages`
@@ -1096,14 +1119,18 @@ sequenceDiagram
   Scheduler->>PG: Évalue DAG
   Scheduler->>PG: Sélectionne worker compatible
   Scheduler->>PG: Réserve CPU/RAM
-  Scheduler->>PG: JobRun = queued + OutboxMessage(job.ready)
+  Scheduler->>PG: JobRun = queued + OutboxMessage(job.assigned)
 
   Outbox->>PG: Lit OutboxMessage pending
-  Outbox->>MQ: Publie job.ready
+  Outbox->>MQ: Publie job.assigned (clé worker.{id})
   Outbox->>PG: Marque OutboxMessage published
 
-  MQ->>Worker: Livre job.ready
-  Worker->>PG: Recharge JobRun et vérifie idempotence
+  MQ->>Worker: Livre job.assigned (ordre autonome)
+  Worker->>Worker: Vérifie la disponibilité de Docker sans exécuter le dépôt
+  Worker->>MQ: Publie job.start.requested
+  MQ->>Scheduler: Livre job.start.requested
+  Scheduler->>PG: JobRun = running + OutboxMessage(job.start.accepted)
+  MQ->>Worker: Livre job.start.accepted
   Worker->>Git: Clone repo au SHA
   Worker->>FS: Restaure artifacts des dépendances
   Worker->>Docker: Lance conteneur avec limites CPU/RAM
@@ -1112,25 +1139,24 @@ sequenceDiagram
   Worker->>MQ: Publie chunks de logs
   MQ->>API: Transmet chunks de logs
   API->>UI: SSE logs temps réel
+  Worker->>MQ: Publie step.finished (à chaque step)
   Worker->>FS: Upload artifacts
-  Worker->>PG: Met à jour JobRun/StepRuns/Artifacts + RunEvent(job_finished)
-  Worker->>MQ: Publie job.finished pour réveiller le Scheduler
-  Worker->>MQ: ACK du message job.ready
+  Worker->>MQ: Publie job.finished (statut, métadonnées logs/artifacts, consommation)
+  Worker->>MQ: ACK du message job.assigned
 
   MQ->>Scheduler: Livre job.finished
-  Scheduler->>PG: Recharge le JobRun finalisé depuis PostgreSQL
+  Scheduler->>PG: Valide et écrit JobRun/StepRuns/Artifacts
   Scheduler->>PG: Libère ressources
-  Scheduler->>PG: Débloque jobs dépendants
+  Scheduler->>PG: Débloque jobs dépendants + OutboxMessage(job.assigned)
   Scheduler->>PG: Calcule statut final du PipelineRun
+  Scheduler->>MQ: ACK de l'événement
 ```
 
-RabbitMQ peut envoyer un message métier `job.finished` au Scheduler pour éviter qu'il vérifie en permanence la base.
+Le worker **écoute le Scheduler, lui signale la fin de chaque job, et le Scheduler lui envoie les jobs suivants** ([ADR-0001](../../../decisions/ADR-0001-worker-scheduler-communication.md)).
 
-Ce message sert de **signal de réveil** : il dit au Scheduler qu'un job mérite d'être relu.
+`job.finished` porte l'état final. Le Scheduler ne le prend pas pour argent comptant : il vérifie le worker émetteur, la tentative et la transition d'état avant d'écrire, dans la même transaction que la libération des ressources et l'assignation des jobs suivants. Un événement en double ou périmé est ignoré.
 
-Le signal fiable reste l'état final écrit en PostgreSQL par le Worker. Le Scheduler ne doit donc pas faire confiance au payload RabbitMQ pour libérer les ressources ou débloquer le DAG ; il recharge toujours le `JobRun` depuis PostgreSQL.
-
-L'ACK RabbitMQ du message `job.ready` garde son rôle transport : confirmer que l'ordre d'exécution reçu par le Worker a été traité et ne doit pas être redistribué.
+L'ACK RabbitMQ du message `job.assigned` garde son rôle transport : confirmer que l'ordre d'exécution reçu par le Worker a été traité et ne doit pas être redistribué.
 
 ---
 
@@ -1156,8 +1182,10 @@ flowchart TD
 | Valeur | Règle |
 |---|---|
 | `all_success` | Le job s'exécute si toutes ses dépendances sont `success` ou `warning` |
-| `always` | Le job s'exécute dès que toutes ses dépendances sont finales |
+| `always` | Le job s'exécute dès que toutes ses dépendances ont une issue finale connue ; `indeterminate` le bloque |
 | `on_failure` | Le job s'exécute si au moins une dépendance est `failed` ou `dead_lettered` |
+
+`indeterminate` indique qu'un worker a disparu après l'autorisation de démarrer sans résultat confirmé. Par défaut, le Scheduler ne relance pas le job et ne débloque aucun descendant, même avec `run_if: always`. Le PipelineRun prend aussi le statut `indeterminate`. Un `job.finished` tardif de la même tentative peut résoudre l'état ; sinon une vérification humaine des effets externes est nécessaire avant toute nouvelle exécution. Le YAML v2 permet `retry.worker_loss: unsafe` par job : le Scheduler garde l'ancienne tentative comme `indeterminate` dans l'historique et en lance une nouvelle si la limite de trois tentatives le permet. Un résultat tardif de l'ancienne tentative ne remplace pas celui de la nouvelle. Les effets externes peuvent être répétés.
 
 Par défaut :
 
@@ -1179,7 +1207,7 @@ run_if: all_success
 - Le Scheduler réserve CPU/RAM avant le dispatch RabbitMQ.
 - Si aucun worker n'a assez de ressources temporairement, le job passe `waiting_resources`.
 - Si le job demande plus que la capacité de tous les workers, il passe `failed`.
-- Les ressources sont libérées uniquement par le Scheduler, après état final du job.
+- Les ressources sont libérées uniquement par le Scheduler, après résultat final ou perte confirmée du worker ; un worker offline ne reçoit aucun nouveau job avant réconciliation de ses conteneurs.
 
 ### 13.5 Fail-fast V1
 
@@ -1190,6 +1218,7 @@ Le fail-fast V0 devient une évaluation plus fine :
 - les jobs `always` peuvent encore tourner ;
 - les jobs `on_failure` peuvent gérer les erreurs ;
 - les jobs `warning` restent non bloquants.
+- un job `indeterminate` suspend l'évaluation de tous ses descendants jusqu'à résolution.
 
 ---
 
@@ -1226,7 +1255,7 @@ services:
     image: rustkins/api:dev
     environment:
       DATABASE_URL: postgres://rustkins:rustkins@postgres:5432/rustkins
-      RABBITMQ_URL: amqp://rustkins:rustkins@rabbitmq:5672
+      RABBITMQ_URL: ${RABBITMQ_API_URL}
       RUSTFS_ENDPOINT: http://rustfs:9000
       JWT_ISSUER: rustkins
       JWT_AUDIENCE: rustkins-ui
@@ -1246,7 +1275,7 @@ services:
     image: rustkins/scheduler:dev
     environment:
       DATABASE_URL: postgres://rustkins:rustkins@postgres:5432/rustkins
-      RABBITMQ_URL: amqp://rustkins:rustkins@rabbitmq:5672
+      RABBITMQ_URL: ${RABBITMQ_SCHEDULER_URL}
       SCHEDULER_POLL_INTERVAL_SECONDS: 2
     depends_on:
       - postgres
@@ -1257,34 +1286,35 @@ services:
   worker-1:
     image: rustkins/worker:dev
     environment:
+      WORKER_ID: ${WORKER_1_ID}
       WORKER_NAME: worker-1
       WORKER_TOTAL_CPU_MILLI: 4000
       WORKER_TOTAL_MEMORY_MB: 8192
-      DATABASE_URL: postgres://rustkins:rustkins@postgres:5432/rustkins
-      RABBITMQ_URL: amqp://rustkins:rustkins@rabbitmq:5672
+      # Pas de DATABASE_URL : les workers n'accèdent pas à PostgreSQL (ADR-0001).
+      RABBITMQ_URL: ${RABBITMQ_WORKER_1_URL}
       RUSTFS_ENDPOINT: http://rustfs:9000
       WORKER_WORKDIR: /workdir
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - worker_1_workdir:/workdir
     networks:
-      - rustkins-private
+      - rustkins-worker
 
   worker-2:
     image: rustkins/worker:dev
     environment:
+      WORKER_ID: ${WORKER_2_ID}
       WORKER_NAME: worker-2
       WORKER_TOTAL_CPU_MILLI: 4000
       WORKER_TOTAL_MEMORY_MB: 8192
-      DATABASE_URL: postgres://rustkins:rustkins@postgres:5432/rustkins
-      RABBITMQ_URL: amqp://rustkins:rustkins@rabbitmq:5672
+      RABBITMQ_URL: ${RABBITMQ_WORKER_2_URL}
       RUSTFS_ENDPOINT: http://rustfs:9000
       WORKER_WORKDIR: /workdir
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - worker_2_workdir:/workdir
     networks:
-      - rustkins-private
+      - rustkins-worker
 
   postgres:
     image: postgres:16
@@ -1300,14 +1330,15 @@ services:
   rabbitmq:
     image: rabbitmq:3-management
     environment:
-      RABBITMQ_DEFAULT_USER: rustkins
-      RABBITMQ_DEFAULT_PASS: rustkins
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_ADMIN_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_ADMIN_PASSWORD}
     ports:
       - "15672:15672"
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     networks:
       - rustkins-private
+      - rustkins-worker
 
   rustfs:
     image: rustfs/rustfs:latest
@@ -1321,6 +1352,7 @@ services:
       - rustfs_data:/data
     networks:
       - rustkins-private
+      - rustkins-worker
 
 volumes:
   postgres_data:
@@ -1332,7 +1364,12 @@ volumes:
 networks:
   rustkins-public:
   rustkins-private:
+  rustkins-worker:
 ```
+
+Le réseau `rustkins-worker` ne contient que les workers, RabbitMQ et RustFS : PostgreSQL n'y est pas directement joignable. Le socket Docker sur le même hôte peut contourner cette séparation ; cet exemple est destiné au développement local.
+
+`WORKER_1_ID` et `WORKER_2_ID` sont distincts et stables. Les URL RabbitMQ de l'API, du Scheduler et de chaque worker utilisent des comptes distincts, provisionnés avec les droits d'[ARCH-02 §9](../../architecture/components/messaging/02-rabbitmq-architecture.md#9-worker-events) avant le démarrage. Le compte administrateur du broker sert uniquement au provisionnement ; aucun composant applicatif ne le reçoit.
 
 ---
 
@@ -1345,6 +1382,8 @@ docker swarm init
 docker node update --label-add rustkins.role=core <core-node>
 docker node update --label-add rustkins.role=worker <worker-node-1>
 docker node update --label-add rustkins.role=worker <worker-node-2>
+docker node update --label-add rustkins.worker_id=worker-1 <worker-node-1>
+docker node update --label-add rustkins.worker_id=worker-2 <worker-node-2>
 ```
 
 Principes :
@@ -1389,6 +1428,9 @@ services:
       - private
     deploy:
       replicas: 1
+      placement:
+        constraints:
+          - node.labels.rustkins.role == core
       labels:
         - traefik.enable=true
         - traefik.http.routers.rustkins-ui.rule=PathPrefix(`/`)
@@ -1398,7 +1440,7 @@ services:
     image: rustkins/api:v1
     environment:
       DATABASE_URL: postgres://rustkins:rustkins@postgres:5432/rustkins
-      RABBITMQ_URL: amqp://rustkins:rustkins@rabbitmq:5672
+      RABBITMQ_URL: ${RABBITMQ_API_URL}
       RUSTFS_ENDPOINT: http://rustfs:9000
       RUSTKINS_PUBLIC_URL: http://rustkins.example.local
     networks:
@@ -1417,7 +1459,7 @@ services:
     image: rustkins/scheduler:v1
     environment:
       DATABASE_URL: postgres://rustkins:rustkins@postgres:5432/rustkins
-      RABBITMQ_URL: amqp://rustkins:rustkins@rabbitmq:5672
+      RABBITMQ_URL: ${RABBITMQ_SCHEDULER_URL}
       SCHEDULER_POLL_INTERVAL_SECONDS: 2
     networks:
       - private
@@ -1427,11 +1469,11 @@ services:
         constraints:
           - node.labels.rustkins.role == core
 
-  worker:
+  worker-1:
     image: rustkins/worker:v1
     environment:
-      DATABASE_URL: postgres://rustkins:rustkins@postgres:5432/rustkins
-      RABBITMQ_URL: amqp://rustkins:rustkins@rabbitmq:5672
+      WORKER_ID: ${WORKER_1_ID}
+      RABBITMQ_URL: ${RABBITMQ_WORKER_1_URL}
       RUSTFS_ENDPOINT: http://rustfs:9000
       WORKER_TOTAL_CPU_MILLI: 4000
       WORKER_TOTAL_MEMORY_MB: 8192
@@ -1440,12 +1482,13 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - worker_workdir:/workdir
     networks:
-      - private
+      - workers
     deploy:
-      mode: global
+      replicas: 1
       placement:
         constraints:
           - node.labels.rustkins.role == worker
+          - node.labels.rustkins.worker_id == worker-1
 
   postgres:
     image: postgres:16
@@ -1466,12 +1509,13 @@ services:
   rabbitmq:
     image: rabbitmq:3-management
     environment:
-      RABBITMQ_DEFAULT_USER: rustkins
-      RABBITMQ_DEFAULT_PASS: rustkins
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_ADMIN_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_ADMIN_PASSWORD}
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     networks:
       - private
+      - workers
     deploy:
       replicas: 1
       placement:
@@ -1488,6 +1532,7 @@ services:
       - rustfs_data:/data
     networks:
       - private
+      - workers
     deploy:
       replicas: 1
       placement:
@@ -1505,6 +1550,8 @@ networks:
     driver: overlay
   private:
     driver: overlay
+  workers:
+    driver: overlay
 ```
 
 Déploiement :
@@ -1512,6 +1559,13 @@ Déploiement :
 ```bash
 docker stack deploy -c stack.v1.yml rustkins
 ```
+
+Chaque autre worker nécessite un service distinct, un `WORKER_ID`
+stable, un compte RabbitMQ propre et une contrainte de placement vers
+son hôte dédié. Le mode `global` avec une URL RabbitMQ partagée ne
+respecterait pas l'identité par worker. Les variables d'environnement
+du fichier stack doivent être renseignées lors du rendu de la
+configuration avant `docker stack deploy`.
 
 ---
 
@@ -1522,7 +1576,7 @@ docker stack deploy -c stack.v1.yml rustkins
 | Commande | `docker compose up -d` | `docker stack deploy` |
 | Cible | Machine dev | Plusieurs nodes |
 | Réseau | Bridge Compose | Overlay Swarm |
-| Workers | Plusieurs conteneurs locaux | Un service global sur nodes workers |
+| Workers | Plusieurs conteneurs locaux | Un service par worker, placé sur son hôte dédié |
 | Placement | Non significatif | Labels `core` / `worker` |
 | Volumes | Volumes locaux | Volumes locaux du node ciblé |
 | PostgreSQL | Local compose | Core node |
@@ -1583,7 +1637,6 @@ WORKER_TOTAL_CPU_MILLI
 WORKER_TOTAL_MEMORY_MB
 WORKER_WORKDIR
 WORKER_HEARTBEAT_INTERVAL_SECONDS
-DATABASE_URL
 RABBITMQ_URL
 RUSTFS_ENDPOINT
 RUSTFS_ACCESS_KEY
@@ -1679,9 +1732,9 @@ Le run reste consultable, mais l'archive n'est plus téléchargeable.
 
 ### 19.1 Docker socket
 
-Chaque Worker ayant accès au Docker socket contrôle fortement son host Docker.
+Chaque Worker ayant accès au Docker socket contrôle fortement son host Docker. La séparation des réseaux de conteneurs ne protège pas PostgreSQL si le démon Docker est partagé. En production, le plan de contrôle et les workers utilisent des hôtes distincts ; aucun Worker ne dispose du socket Docker d'un hôte du plan de contrôle.
 
-Accepté en V1, mais à revoir plus tard avec :
+Pistes de durcissement supplémentaires :
 
 ```txt
 - sandbox plus stricte
@@ -1709,13 +1762,19 @@ RabbitMQ fonctionne en livraison at-least-once.
 Le Worker doit toujours :
 
 ```txt
-1. recharger JobRun depuis PostgreSQL
-2. vérifier le statut courant
-3. ignorer les jobs déjà terminés
-4. ACK le doublon
+1. publier job.start.requested et attendre job.start.accepted avant de lancer Docker
+2. ACK sans exécution un job.start.rejected
 ```
 
-Un même `JobRun` ne doit jamais être exécuté deux fois.
+Le Scheduler doit toujours :
+
+```txt
+1. valider le user_id AMQP, le worker assigné, la tentative et la transition d'état de chaque événement
+2. ignorer et ACK les résultats en double ou périmés
+3. inscrire running, start_request_id et job.start.accepted dans une même transaction ; rejouer l'acceptation pour la même demande encore active, refuser les autres
+```
+
+Une tentative de `JobRun` n'est autorisée qu'une fois. Si son issue est perdue après cette autorisation, le Scheduler passe le job et le run à `indeterminate` sans nouvelle tentative automatique par défaut. Les pannes antérieures à l'autorisation utilisent les délais de retry V1. Pour un job YAML v2 avec `retry.worker_loss: unsafe`, une perte du Worker autorisé déclenche une nouvelle tentative avec ces mêmes délais si la limite de trois tentatives le permet. La tentative précédente reste `indeterminate` dans l'historique ; ses événements tardifs ne modifient pas la tentative courante. Si la limite est atteinte sans résultat confirmé, le job et le run restent `indeterminate`, pas `dead_lettered`. Cette option peut répéter des effets externes et ne s'applique pas à une erreur métier ni à un échec connu. Les pipelines YAML v1 gardent le comportement par défaut.
 
 ---
 
@@ -1827,33 +1886,35 @@ La V1 est considérée comme validée si :
 17. Le Scheduler réserve les ressources avant dispatch.
 18. Un job sans worker compatible temporaire passe `waiting_resources`.
 19. Un job trop gros pour tous les workers passe `failed`.
-20. Un message `job.ready` est créé via `OutboxMessage`.
+20. Un message `job.assigned` est créé via `OutboxMessage` et routé vers la file du worker choisi.
 21. L'Outbox Publisher publie vers RabbitMQ après commit.
-22. Un Worker recharge le `JobRun` depuis PostgreSQL avant exécution.
+22. Un Worker exécute un job sans accès à PostgreSQL ; ses événements sont validés puis écrits par le Scheduler.
 23. Un doublon RabbitMQ n'exécute pas deux fois le même job.
-24. Une erreur infrastructure est retry avec les délais V1.
-25. Après 3 tentatives, un job passe `dead_lettered`.
-26. Une erreur métier ne déclenche pas de retry.
-27. Une step `continue_on_error` en échec devient `warning`.
-28. Un job `optional` en échec métier devient `warning`.
-29. Un pipeline avec warning mais sans échec obligatoire devient `warning`.
-30. `run_if: always` s'exécute après une dépendance échouée.
-31. `run_if: on_failure` s'exécute seulement après `failed` ou `dead_lettered`.
-32. Un run peut être annulé.
-33. Un job en cours peut recevoir une demande d'annulation.
-34. Les ressources sont libérées après état final.
-35. Un Worker offline est détecté par heartbeat.
-36. Les logs sont visibles en temps réel via SSE.
-37. Une reconnexion SSE reprend les logs manquants.
-38. Les logs complets restent consultables depuis RustFS.
-39. Un job peut uploader un artifact.
-40. Un artifact est archivé en `tar.gz`.
-41. Le checksum SHA-256 est stocké.
-42. Un artifact est téléchargeable via API et URL signée.
-43. Un job dépendant restaure les artifacts directs de ses `needs`.
-44. Les artifacts expirés sont supprimés de RustFS.
-45. La stack peut tourner en Docker Compose dev.
-46. La stack peut être déployée en Swarm simple avec plusieurs workers.
+24. Une erreur d'infrastructure survenue avant l'autorisation de démarrer est retry avec les délais V1.
+25. Après 3 tentatives préalables au démarrage, un job passe `dead_lettered`.
+26. Si un worker disparaît après autorisation sans résultat confirmé, le job et le run passent `indeterminate` par défaut ; aucun descendant ni nouvelle tentative ne démarre. Un résultat tardif authentifié peut résoudre cet état.
+27. Avec `retry.worker_loss: unsafe`, une perte du Worker autorisé crée une nouvelle tentative si la limite le permet ; l'ancienne reste dans l'historique et son résultat tardif ne remplace pas le résultat courant. Si la limite est atteinte sans résultat confirmé, l'issue reste `indeterminate`.
+28. Une erreur métier ne déclenche pas de retry.
+29. Une step `continue_on_error` en échec devient `warning`.
+30. Un job `optional` en échec métier devient `warning`.
+31. Un pipeline avec warning mais sans échec obligatoire devient `warning`.
+32. `run_if: always` s'exécute après une dépendance échouée.
+33. `run_if: on_failure` s'exécute seulement après `failed` ou `dead_lettered`.
+34. Un run peut être annulé.
+35. Un job en cours peut recevoir une demande d'annulation.
+36. Les ressources sont libérées après état final.
+37. Un Worker offline est détecté par heartbeat.
+38. Les logs sont visibles en temps réel via SSE.
+39. Une reconnexion SSE reprend les logs manquants.
+40. Les logs complets restent consultables depuis RustFS.
+41. Un job peut uploader un artifact.
+42. Un artifact est archivé en `tar.gz`.
+43. Le checksum SHA-256 est stocké.
+44. Un artifact est téléchargeable via API et URL signée.
+45. Un job dépendant restaure les artifacts directs de ses `needs`.
+46. Les artifacts expirés sont supprimés de RustFS.
+47. La stack peut tourner en Docker Compose dev.
+48. La stack peut être déployée en Swarm simple avec plusieurs workers.
 
 ---
 

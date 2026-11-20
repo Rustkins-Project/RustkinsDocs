@@ -109,6 +109,7 @@ erDiagram
         string image
         string run_if
         bool optional
+        string retry_worker_loss
         int cpu_limit_milli
         int memory_limit_mb
         int timeout_seconds
@@ -181,8 +182,11 @@ erDiagram
         uuid job_run_id FK
         uuid worker_node_id FK
         int attempt_number
+        uuid start_request_id
         string status
         string error_message
+        float cpu_seconds
+        int memory_peak_mb
         datetime started_at
         datetime finished_at
     }

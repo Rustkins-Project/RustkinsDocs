@@ -6,6 +6,7 @@ status: draft
 summary: "Responsabilités du scheduler V1 : DAG, ressources, outbox, dispatch des jobs, retries, annulations et pannes de workers."
 topics: [scheduler, dag, outbox, retry, worker]
 applies_to: [V1]
+related_adrs: [ADR-0001]
 ---
 
 # ARCH-11 --- Scheduler Architecture (Rustkins V1)
@@ -31,9 +32,14 @@ Responsibilities:
 -   Publish outbox messages to RabbitMQ
 -   Manage retries
 -   Handle cancellations
+-   Consume Worker events and write runtime state
 -   React to worker failures
 
 The Scheduler never executes containers.
+
+The Scheduler is the only writer of runtime execution state (JobRun,
+StepRun, WorkerNode). Workers never access PostgreSQL
+([ADR-0001](../../../../decisions/ADR-0001-worker-scheduler-communication.md)).
 
 ------------------------------------------------------------------------
 
@@ -47,8 +53,9 @@ Webhook --> Scheduler
 Scheduler --> PostgreSQL
 PostgreSQL --> OutboxPublisher
 OutboxPublisher --> RabbitMQ
-Worker --> PostgreSQL
-Worker --> RabbitMQ
+RabbitMQ -->|job.assigned / cancel| Worker
+Worker -->|events| RabbitMQ
+RabbitMQ -->|events| Scheduler
 ```
 
 PostgreSQL is the source of truth.
@@ -73,6 +80,9 @@ The Scheduler MUST:
 -   run the outbox publisher loop
 -   unlock dependent jobs
 -   schedule retries
+-   consume Worker events (`rustkins.events`) and persist the
+    resulting states
+-   register Workers and record their heartbeats
 -   react to worker heartbeat loss
 
 The Scheduler MUST NOT:
@@ -172,7 +182,7 @@ Scheduler->>PostgreSQL: Lock Worker
 Scheduler->>PostgreSQL: Validate capacity
 Scheduler->>PostgreSQL: Reserve CPU/RAM
 Scheduler->>PostgreSQL: JobRun = queued
-Scheduler->>PostgreSQL: Insert OutboxMessage(job.ready)
+Scheduler->>PostgreSQL: Insert OutboxMessage(job.assigned)
 ```
 
 Reservation, JobRun update and OutboxMessage creation occur in one
@@ -191,37 +201,77 @@ Outbox Publisher flow:
 3.  Mark the OutboxMessage as `published`.
 4.  If publication fails, increment attempts and schedule a retry.
 
-Published messages contain only identifiers.
+The `job.assigned` message is routed with the key `worker.{worker_id}`
+to the queue of the Worker on which resources were reserved.
 
-Worker reloads complete state from PostgreSQL.
+It is a self-contained execution order: repository and SHA, image,
+steps, limits, timeout, artifacts to produce and upstream artifacts to
+restore. The Scheduler resolves all of it from PostgreSQL before
+writing the OutboxMessage.
 
 Advantages
 
--   lightweight messages
--   idempotency
--   single source of truth
+-   Workers need no database access
+-   the job reaches the Worker that holds the reservation
+-   single source of truth, single writer
 
 ------------------------------------------------------------------------
 
 # 9. Completion Handling
 
-Worker updates JobRun.
+The Worker publishes `job.finished` on `rustkins.events`.
 
-Scheduler reacts.
+The Scheduler, in one transaction:
 
-Possible actions
+1.  validates the sender Worker, the attempt and the state transition;
+2.  writes the final JobRun state, log and artifact metadata and
+    measured resource usage;
+3.  releases reserved resources;
+4.  unlocks dependent jobs, selects their Workers, reserves resources
+    and inserts their `job.assigned` OutboxMessages;
+5.  completes the PipelineRun, schedules a retry or marks the JobRun
+    `dead_lettered` when applicable.
 
--   release reserved resources
--   unlock dependent jobs
--   complete PipelineRun
--   schedule retry
--   mark dead_lettered
+The event is acknowledged after commit. Duplicate or stale result events
+are ignored; start requests receive a correlated response instead.
+
+`step.finished` updates StepRun state. `job.start.requested` follows the
+authorization protocol below.
+
+For `job.start.requested`, the Scheduler first verifies the RabbitMQ-validated
+`user_id`, the assigned Worker and the attempt. In one transaction it
+moves a `queued` attempt to `running`, stores its `start_request_id` and
+inserts an OutboxMessage for `job.start.accepted`. A retransmission
+with the same request ID on the still-current running attempt receives
+another acceptance through the outbox, without authorizing execution
+twice. A different or stale request receives `job.start.rejected` through
+the outbox. Both responses copy
+the request's `start_request_id` so the Worker can match the response
+to its pending delivery. The Scheduler ACKs the request only after the
+response is persisted.
+The Worker starts Docker only after receiving acceptance. This durable
+authorization replaces a local Worker deduplication registry; each
+attempt can be authorized once. If the Worker disappears after
+authorization without a confirmed final event, the Scheduler cannot
+know whether external effects occurred. It marks the JobRun
+`indeterminate` and does not automatically dispatch another attempt by
+default.
+A late valid `job.finished` from the original Worker and attempt may
+resolve this state.
 
 ------------------------------------------------------------------------
 
 # 10. Retry Management
 
-Infrastructure failures only.
+Automatic retries apply by default only to failures before start
+authorization. Once `job.start.accepted` is committed, a lost outcome
+becomes `indeterminate` without retry. YAML v2 permits an explicit
+`retry.worker_loss: unsafe` per job: on Worker loss, record the old
+attempt as `indeterminate` and schedule a new attempt if the global
+three-attempt limit permits. The JobRun becomes `retrying`; a late
+result from the old attempt remains audit data and cannot overwrite
+the current attempt. This option can repeat external effects. V0 and
+YAML v1 use the safe default `never`.
 
 Policy
 
@@ -237,12 +287,16 @@ Maximum attempts
 3
 ```
 
-When exhausted
+When pre-authorization retries are exhausted
 
 ``` text
 JobRun = dead_lettered
 PipelineRun = failed
 ```
+
+If an authorized Worker is lost without a confirmed result and the
+attempt limit is exhausted, the JobRun and PipelineRun are
+`indeterminate`, including with `retry.worker_loss: unsafe`.
 
 ------------------------------------------------------------------------
 
@@ -257,15 +311,16 @@ cancelled
 Running JobRun
 
 1.  cancel_requested
-2.  create cancel OutboxMessage
-3.  wait worker confirmation
+2.  create cancel OutboxMessage routed to the assigned Worker's control
+    queue; a run-wide cancellation targets each Worker with active jobs
+3.  wait for the Worker `job.finished` event with status `cancelled`
 4.  release resources
 5.  mark JobRun cancelled
 
 Timeout
 
 ``` text
-failed
+indeterminate if the Worker may have executed code and no final result is confirmed
 ```
 
 ------------------------------------------------------------------------
@@ -278,19 +333,30 @@ Scheduler
 
 -   marks Worker offline
 -   releases reservations
--   evaluates running JobRuns
+-   checks whether each assigned attempt was authorized to start
 
-If attempts remain
+If start was never authorized and attempts remain
 
 ``` text
 retrying
 ```
 
-Otherwise
+If start was never authorized and attempts are exhausted
 
 ``` text
 dead_lettered
 ```
+
+If start was authorized and no final event was confirmed:
+
+``` text
+indeterminate
+```
+
+The Scheduler does not dispatch another attempt or unlock dependent
+jobs. A late event from the same Worker and attempt can still resolve
+the outcome. Reconnecting Workers must report existing containers
+before accepting new assignments.
 
 ------------------------------------------------------------------------
 
@@ -303,6 +369,7 @@ success
 warning
 failed
 cancelled
+indeterminate
 ```
 
 only after every JobRun reaches a final state.
@@ -334,11 +401,14 @@ RabbitMQ publication happens after commit through the Outbox Publisher.
 Scheduler reacts to
 
 -   PipelineRun created
--   JobRun finished
+-   `worker.registered`
+-   `worker.heartbeat`
+-   `job.start.requested`
+-   `step.finished`
+-   `job.finished`
 -   Retry timeout
 -   Cancel request
--   Worker heartbeat
--   Worker offline
+-   Worker offline (heartbeat timeout)
 
 ------------------------------------------------------------------------
 
@@ -356,9 +426,16 @@ No reservation is rolled back because RabbitMQ is transport only.
 
 Publication resumes when RabbitMQ is available.
 
+Worker events are delayed. Live Workers retry unconfirmed events in
+memory; confirmed events stay in RabbitMQ until the Scheduler commits
+and ACKs them. Heartbeat timeouts must tolerate a short broker outage
+before marking Workers offline.
+
 Worker unavailable
 
-Retry or dead_lettered.
+Before authorization: retry or `dead_lettered`. After authorization:
+`indeterminate` by default; retry only with explicit YAML v2
+`retry.worker_loss: unsafe` and remaining attempts.
 
 Oversized Job
 
@@ -375,6 +452,9 @@ Immediate failed.
 -   Job dispatch is always persisted as an OutboxMessage before RabbitMQ publication.
 -   Runtime control messages are also persisted as OutboxMessages before RabbitMQ publication.
 -   Runtime state is persisted before messaging.
+-   The Scheduler is the only writer of JobRun, StepRun and WorkerNode
+    runtime state.
+-   Every Worker event is validated before being persisted.
 
 ------------------------------------------------------------------------
 
@@ -384,11 +464,12 @@ Immediate failed.
 
 Decision
 
-Centralized scheduling.
+Centralized scheduling. Workers communicate only with the Scheduler,
+through RabbitMQ, and never access PostgreSQL.
 
 Consequence
 
-Workers remain simple executors.
+Workers remain simple executors. See [ADR-0001](../../../../decisions/ADR-0001-worker-scheduler-communication.md).
 
 ------------------------------------------------------------------------
 
