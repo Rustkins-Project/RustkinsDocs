@@ -8,14 +8,14 @@ topics: [eco-design, sobriety, scheduler, worker, provisioning, metrics]
 applies_to: [all]
 related_adrs: [ADR-0001]
 related_docs:
-  - docs/architecture/components/scheduler/06-resource-scheduling.md
-  - docs/architecture/components/worker/09-worker-architecture.md
-  - docs/architecture/components/messaging/02-rabbitmq-architecture.md
-  - docs/architecture/components/storage/04-artifacts.md
-  - docs/architecture/components/logging/03-real-time-logs.md
-  - docs/specifications/pipeline/yaml-v3.md
-  - docs/cross-cutting/business-model/business-model.md
-  - docs/cross-cutting/communication/positioning-and-messages.md
+  - DOC-0007
+  - DOC-0011
+  - DOC-0005
+  - DOC-0010
+  - DOC-0004
+  - DOC-0019
+  - DOC-0101
+  - DOC-0901
 references:
   - https://ecoresponsable.numerique.gouv.fr/publications/referentiel-general-ecoconception/
   - https://eur-lex.europa.eu/eli/dir/2024/825/oj
