@@ -112,3 +112,27 @@ python scripts/validate_docs.py --base-ref origin/main
 La dernière commande requiert une référence `origin/main` disponible localement (`git fetch origin main`). Sans `--base-ref`, aucun accès à `main` n'est nécessaire. Le validateur inspecte tous les documents publiés, les templates et les pages de navigation ; `research/` est exclu. Il contrôle les fichiers locaux et les ancres, mais ne contacte jamais les URL externes. Les références vers des documents obsolètes sont signalées comme avertissements ; les erreurs donnent un code de sortie non nul. Le contrôle historique compare les IDs de la base et de la branche : un déplacement avec ID conservé passe. La continuité du sujet d'un document déplacé reste à apprécier en revue humaine.
 
 Le workflow `.github/workflows/docs-validation.yml` exécute les tests et la validation sur le commit de fusion temporaire de chaque PR vers `main`, avec comparaison des identités publiées au SHA de la base de la PR. Un push sur `main` relance la validation courante. Le job **Validate documentation** pourra être marqué comme required status check après recette par les administrateurs. Pour que ce résultat reste valable si `main` avance avant le merge, activer également **Require branches to be up to date before merging**. La protection de `main`, l'interdiction des pushes directs et force-pushs et les reviewers humains ciblés pour `decisions/**` sont des réglages GitHub manuels. Ne pas imposer une revue aux connaissances.
+
+### Hook pre-commit local
+
+Le dépôt fournit une configuration `.pre-commit-config.yaml` pour exécuter **avant chaque commit** la validation documentaire complète :
+
+```bash
+python scripts/validate_docs.py
+```
+
+Les tests Python (`python -m pytest -q`) restent exécutés par **GitHub Actions** et peuvent être lancés manuellement lors d'une modification du validateur ; ils ne ralentissent pas les commits documentaires ordinaires.
+
+Installer [pre-commit](https://pre-commit.com/) sur le poste de développement, avec Python (idéalement 3.13 comme dans la CI), puis activer le hook dans **chaque clone** :
+
+```bash
+python -m pip install pre-commit
+pre-commit install --hook-type pre-commit
+pre-commit run --all-files
+```
+
+La première exécution installe les dépendances du validateur dans un environnement Python isolé. Elles reprennent les trois dépendances nécessaires dans `requirements.txt` (sans `pytest`) ; un test automatisé en vérifie la cohérence. Le hook parcourt **tout le dépôt**, même pour un commit portant sur un seul fichier : il ne passe pas de liste de fichiers modifiés au script. Si la validation échoue, `git commit` est interrompu ; corriger les erreurs avant de recommencer.
+
+Le contrôle historique (`--base-ref origin/main`) reste assuré de manière fiable par la **CI des Pull Requests**, qui connaît le SHA exact de la branche de base. Pour le reproduire localement après un `git fetch origin main`, lancer explicitement `python scripts/validate_docs.py --base-ref origin/main`.
+
+Le hook reste une protection **locale et facultative à installer par clone** : la CI GitHub Actions et les protections de `main` demeurent les contrôles bloquants pour la fusion. Pour désinstaller le hook local : `pre-commit uninstall`.
