@@ -17,6 +17,7 @@ REQUIRED = {
 }
 OPTIONAL_NONEMPTY = {"runbook": ("Retour arrière", "Références")}
 COMMENT = re.compile(r"<!--.*?-->", re.DOTALL)
+EMAIL = re.compile(r"[^@\s/]+@[^@\s/]+\.[^@\s/]+\Z")
 
 
 def slug(title: str) -> str:
@@ -32,15 +33,19 @@ def heading_text(inline) -> str:
 
 def headings(tokens):
     found = []
-    counts = {}
+    used = set()
     for index, token in enumerate(tokens[:-1]):
         if token.type != "heading_open":
             continue
         title = heading_text(tokens[index + 1])
         base = slug(title)
-        count = counts.get(base, 0)
-        counts[base] = count + 1
-        found.append((index, int(token.tag[1:]), title, base if count == 0 else f"{base}-{count}", token.map[0] + 1))
+        anchor = base
+        suffix = 1
+        while anchor in used:
+            anchor = f"{base}-{suffix}"
+            suffix += 1
+        used.add(anchor)
+        found.append((index, int(token.tag[1:]), title, anchor, token.map[0] + 1))
     return found
 
 
@@ -96,7 +101,13 @@ def local_target(root: Path, source: Path, href: str):
 def external_error(href: str):
     try:
         parsed = urlsplit(href)
-        if parsed.scheme in ("http", "https") and parsed.hostname and not re.search(r"\s", href):
+        if re.search(r"\s", href):
+            return "URL externe invalide"
+        if parsed.scheme in ("http", "https", "ftp", "ftps") and parsed.hostname:
+            return None
+        if parsed.scheme == "mailto" and parsed.path and all(
+            EMAIL.fullmatch(address) for address in unquote(parsed.path).split(",")
+        ):
             return None
         return "URL externe invalide"
     except ValueError:

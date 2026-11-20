@@ -14,7 +14,7 @@ REPO = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(REPO / "scripts"))
 
 from doccheck.frontmatter import parse  # noqa: E402
-from doccheck.links import slug  # noqa: E402
+from doccheck.links import PARSER, headings, slug  # noqa: E402
 from doccheck.rules import validate  # noqa: E402
 
 
@@ -168,6 +168,14 @@ def test_links_references_images_anchors_unicode_and_code(repo):
     assert has(messages(repo), "cible locale introuvable")
 
 
+def test_heading_collisions_reserve_generated_anchors(repo):
+    body = "# Document\n\n## Installation\n\n## Installation\n\n## Installation-1\n\n[third](#installation-1-1)\n"
+    write(repo, body=body)
+    anchors = [item[3] for item in headings(PARSER.parse(body))]
+    assert anchors == ["document", "installation", "installation-1", "installation-1-1"]
+    assert not [issue for issue in messages(repo) if issue.level == "error"]
+
+
 def test_navigation_research_and_bad_links(repo):
     write(repo)
     (repo / "README.md").write_text("# Accueil\n\n[doc](docs/architecture/a.md)\n", encoding="utf-8")
@@ -184,6 +192,15 @@ def test_external_url_syntax_without_network(repo, monkeypatch):
     monkeypatch.setattr(socket, "create_connection", lambda *a, **k: pytest.fail("network used"))
     write(repo, body="# Document\n\n[ok](https://example.org/a#b) [bad](https://)\n")
     assert has(messages(repo), "URL externe invalide")
+
+
+def test_mailto_and_ftp_links_without_network(repo, monkeypatch):
+    import socket
+    monkeypatch.setattr(socket, "create_connection", lambda *a, **k: pytest.fail("network used"))
+    write(repo, body="# Document\n\n[mail](mailto:team@example.org) [ftp](ftp://example.org/file.txt)\n")
+    assert not [issue for issue in messages(repo) if issue.level == "error"]
+    write(repo, body="# Document\n\n[bad mail](mailto:) [bad ftp](ftp://)\n")
+    assert sum(issue.category == "lien" for issue in messages(repo)) == 2
 
 
 def test_adr_graph(repo):
