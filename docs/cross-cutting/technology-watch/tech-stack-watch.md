@@ -1,12 +1,12 @@
 ---
-id: DOC-0103
+id: DOC-0109
 title: "Veille technologique — stack Rustkins"
 type: cross-cutting
 status: draft
 summary: "Processus de veille sur les outils de Rustkins (Rust, Tokio, Axum, lapin, SQLx, S3/RustFS, bollard, RabbitMQ, PostgreSQL, Next.js, Traefik) et état de chaque outil au 10 novembre 2026."
 topics: [technology-watch, rust, dependencies, security, stack]
 applies_to: [all]
-related_docs: [DOC-0102, DOC-0023]
+related_docs: [DOC-0108, DOC-0023]
 ---
 
 # Veille technologique — stack Rustkins
