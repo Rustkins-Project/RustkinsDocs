@@ -1,28 +1,16 @@
-# Local hooks exécutant les mêmes commandes que la CI documentaire.
-# Maintenir additional_dependencies synchronisé avec requirements.txt (contrôlé par pytest).
-fail_fast: true
+# Vérification documentaire locale avant chaque commit.
+# Les tests Python et le contrôle historique des IDs restent obligatoires dans la CI.
 repos:
   - repo: local
     hooks:
-      - id: rustkins-docs-tests
-        name: RustkinsDocs - tests Python
-        entry: python -m pytest -q
-        language: python
-        additional_dependencies: &docs_dependencies
-          - "PyYAML>=6.0,<7"
-          - "jsonschema>=4.23,<5"
-          - "markdown-it-py>=3.0,<5"
-          - "pytest>=8.0,<10"
-        pass_filenames: false
-        always_run: true
-        stages: [pre-commit]
-        verbose: true
-
       - id: rustkins-docs-validation
         name: RustkinsDocs - validation documentaire
         entry: python scripts/validate_docs.py
         language: python
-        additional_dependencies: *docs_dependencies
+        additional_dependencies:
+          - "PyYAML>=6.0,<7"
+          - "jsonschema>=4.23,<5"
+          - "markdown-it-py>=3.0,<5"
         pass_filenames: false
         always_run: true
         stages: [pre-commit]

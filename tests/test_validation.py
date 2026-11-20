@@ -329,24 +329,30 @@ def test_cli_exit_codes(repo):
     assert bad.returncode != 0 and "cible locale introuvable" in bad.stdout
 
 
-def test_pre_commit_uses_same_local_checks_as_ci():
-    """Les hooks bloquent le commit via les mêmes commandes que la CI, sur tout le dépôt."""
+def test_pre_commit_runs_only_document_validation():
+    """Le commit local vérifie les documents ; la CI garde pytest et l'historique."""
     configuration = yaml.safe_load((REPO / ".pre-commit-config.yaml").read_text(encoding="utf-8"))
-    assert configuration["fail_fast"] is True
     assert len(configuration["repos"]) == 1
     assert configuration["repos"][0]["repo"] == "local"
     hooks = configuration["repos"][0]["hooks"]
-    expected_commands = {"python -m pytest -q", "python scripts/validate_docs.py"}
-    assert {hook["entry"] for hook in hooks} == expected_commands
+    assert len(hooks) == 1
+    hook = hooks[0]
+    assert hook["entry"] == "python scripts/validate_docs.py"
+    assert hook["language"] == "python"
+    assert hook["always_run"] is True
+    assert hook["pass_filenames"] is False
+    assert hook["stages"] == ["pre-commit"]
 
-    dependencies = [line.strip() for line in (REPO / "requirements.txt").read_text(encoding="utf-8").splitlines() if line.strip() and not line.startswith("#")]
-    for hook in hooks:
-        assert hook["language"] == "python"
-        assert hook["additional_dependencies"] == dependencies
-        assert hook["always_run"] is True
-        assert hook["pass_filenames"] is False
-        assert hook["stages"] == ["pre-commit"]
+    dependencies = [
+        line.strip()
+        for line in (REPO / "requirements.txt").read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+        and not line.strip().lower().startswith("pytest")
+    ]
+    assert hook["additional_dependencies"] == dependencies
 
     workflow = yaml.safe_load((REPO / ".github/workflows/docs-validation.yml").read_text(encoding="utf-8"))
     runs = [str(step.get("run", "")) for step in workflow["jobs"]["docs-validation"]["steps"]]
-    assert all(any(command in run for run in runs) for command in expected_commands)
+    assert any("python -m pytest -q" in run for run in runs)
+    assert any("python scripts/validate_docs.py --base-ref" in run for run in runs)
+    assert any("python scripts/validate_docs.py" in run for run in runs)

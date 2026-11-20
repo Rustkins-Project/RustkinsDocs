@@ -115,12 +115,13 @@ Le workflow `.github/workflows/docs-validation.yml` exécute les tests et la val
 
 ### Hook pre-commit local
 
-Le dépôt fournit une configuration `.pre-commit-config.yaml` pour exécuter **avant chaque commit** les deux commandes de la CI :
+Le dépôt fournit une configuration `.pre-commit-config.yaml` pour exécuter **avant chaque commit** la validation documentaire complète :
 
 ```bash
-python -m pytest -q
 python scripts/validate_docs.py
 ```
+
+Les tests Python (`python -m pytest -q`) restent exécutés par **GitHub Actions** et peuvent être lancés manuellement lors d'une modification du validateur ; ils ne ralentissent pas les commits documentaires ordinaires.
 
 Installer [pre-commit](https://pre-commit.com/) sur le poste de développement, avec Python (idéalement 3.13 comme dans la CI), puis activer le hook dans **chaque clone** :
 
@@ -130,7 +131,7 @@ pre-commit install --hook-type pre-commit
 pre-commit run --all-files
 ```
 
-La première exécution installe les dépendances des hooks dans un environnement Python isolé. Les versions des dépendances sont alignées sur `requirements.txt` et vérifiées par les tests. Les hooks parcourent **tout le dépôt**, même pour un commit portant sur un seul fichier : ils ne passent pas une liste de fichiers modifiés aux scripts. Si un contrôle échoue, `git commit` est interrompu ; corriger les erreurs avant de recommencer.
+La première exécution installe les dépendances du validateur dans un environnement Python isolé. Elles reprennent les trois dépendances nécessaires dans `requirements.txt` (sans `pytest`) ; un test automatisé en vérifie la cohérence. Le hook parcourt **tout le dépôt**, même pour un commit portant sur un seul fichier : il ne passe pas de liste de fichiers modifiés au script. Si la validation échoue, `git commit` est interrompu ; corriger les erreurs avant de recommencer.
 
 Le contrôle historique (`--base-ref origin/main`) reste assuré de manière fiable par la **CI des Pull Requests**, qui connaît le SHA exact de la branche de base. Pour le reproduire localement après un `git fetch origin main`, lancer explicitement `python scripts/validate_docs.py --base-ref origin/main`.
 
