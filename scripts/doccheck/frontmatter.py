@@ -16,13 +16,28 @@ SCHEMA_NAMES = {"document": "document", "runbook": "runbook", "adr": "adr", "kno
 FORMATS = FormatChecker()
 
 
+def valid_port(parsed):
+    """Rejeter les ports vides, non numériques ou hors de 1..65535."""
+    if parsed.netloc.endswith(":"):
+        return False
+    try:
+        port = parsed.port
+    except ValueError:
+        return False
+    return port is None or 1 <= port <= 65535
+
+
 @FORMATS.checks("uri")
 def absolute_uri(value):
     if not isinstance(value, str) or re.search(r"\s", value):
         return False
     try:
         parsed = urlsplit(value)
-        return bool(parsed.scheme and (parsed.netloc if parsed.scheme in ("http", "https") else parsed.path))
+        return bool(
+            valid_port(parsed)
+            and parsed.scheme
+            and (parsed.hostname if parsed.scheme in ("http", "https") else parsed.netloc or parsed.path)
+        )
     except ValueError:
         return False
 

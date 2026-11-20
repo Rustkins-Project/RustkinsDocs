@@ -7,6 +7,7 @@ import sys
 from pathlib import Path
 
 import pytest
+import yaml
 from jsonschema import Draft202012Validator
 
 
@@ -203,6 +204,24 @@ def test_mailto_and_ftp_links_without_network(repo, monkeypatch):
     assert sum(issue.category == "lien" for issue in messages(repo)) == 2
 
 
+@pytest.mark.parametrize("url,valid", [
+    ("https://example.org:443/test", True),
+    ("https://example.org:65535/test", True),
+    ("https://example.org:abc/test", False),
+    ("https://example.org:65536/test", False),
+    ("https://example.org:0/test", False),
+    ("https://example.org:/test", False),
+])
+def test_ports_in_markdown_and_frontmatter(repo, url, valid):
+    write(repo, metadata={"references": [url]}, body=f"# Document\n\n[lien]({url})\n")
+    errors = [issue for issue in messages(repo) if issue.level == "error"]
+    if valid:
+        assert not errors
+    else:
+        assert any(issue.category == "lien" for issue in errors)
+        assert any(issue.category == "schema" for issue in errors)
+
+
 def test_adr_graph(repo):
     write(repo, "adr", metadata={"id": "ADR-0001", "status": "superseded"})
     write(repo, "adr", path="decisions/b.md", metadata={"id": "ADR-0002", "status": "accepted", "approved_by": ["Alexis"], "decided_at": "2026-11-20", "supersedes": ["ADR-0001"]})
@@ -226,6 +245,33 @@ def git(repo, *args):
     result = subprocess.run(["git", *args], cwd=repo, text=True, capture_output=True)
     assert result.returncode == 0, result.stderr
     return result
+
+
+def test_workflow_checks_merge_result(repo, monkeypatch):
+    workflow = yaml.safe_load((REPO / ".github/workflows/docs-validation.yml").read_text(encoding="utf-8"))
+    steps = workflow["jobs"]["docs-validation"]["steps"]
+    checkout = next(step for step in steps if step.get("uses", "").startswith("actions/checkout@"))
+    assert "ref" not in checkout.get("with", {})
+
+    monkeypatch.setenv("GIT_CONFIG_COUNT", "1")
+    monkeypatch.setenv("GIT_CONFIG_KEY_0", "safe.directory")
+    monkeypatch.setenv("GIT_CONFIG_VALUE_0", str(repo))
+    git(repo, "init", "-b", "main")
+    git(repo, "add", ".")
+    git(repo, "-c", "user.name=Test", "-c", "user.email=test@example.org", "commit", "-m", "base")
+    git(repo, "switch", "-c", "feature")
+    write(repo, path="docs/architecture/feature.md", metadata={"id": "DOC-0050"})
+    git(repo, "add", ".")
+    git(repo, "-c", "user.name=Test", "-c", "user.email=test@example.org", "commit", "-m", "feature doc")
+    assert not [issue for issue in messages(repo) if issue.level == "error"]
+    git(repo, "switch", "main")
+    write(repo, path="docs/architecture/main.md", metadata={"id": "DOC-0050"})
+    git(repo, "add", ".")
+    git(repo, "-c", "user.name=Test", "-c", "user.email=test@example.org", "commit", "-m", "main doc")
+    git(repo, "switch", "feature")
+    assert not [issue for issue in messages(repo, "main") if issue.level == "error"]
+    git(repo, "-c", "user.name=Test", "-c", "user.email=test@example.org", "merge", "--no-ff", "main", "-m", "merge result")
+    assert has(messages(repo, "main"), "identifiant DOC-0050 dupliqué")
 
 
 def test_history_move_new_change_and_delete(repo, monkeypatch):
@@ -257,6 +303,20 @@ def test_history_same_path_id_change(repo, monkeypatch):
     git(repo, "-c", "user.name=Test", "-c", "user.email=test@example.org", "commit", "-m", "base")
     write(repo, metadata={"id": "DOC-0002"})
     assert has(messages(repo, "HEAD"), "nouveau docs/architecture/a.md (DOC-0002)")
+
+
+def test_history_unicode_filename(repo, monkeypatch):
+    monkeypatch.setenv("GIT_CONFIG_COUNT", "1")
+    monkeypatch.setenv("GIT_CONFIG_KEY_0", "safe.directory")
+    monkeypatch.setenv("GIT_CONFIG_VALUE_0", str(repo))
+    name = "docs/architecture/guide-équipe.md"
+    write(repo, path=name)
+    git(repo, "init", "-b", "main")
+    git(repo, "add", ".")
+    git(repo, "-c", "user.name=Test", "-c", "user.email=test@example.org", "commit", "-m", "base")
+    assert not [issue for issue in messages(repo, "HEAD") if issue.level == "error"]
+    write(repo, path=name, metadata={"id": "DOC-0002"})
+    assert has(messages(repo, "HEAD"), f"nouveau {name} (DOC-0002)")
 
 
 def test_cli_exit_codes(repo):

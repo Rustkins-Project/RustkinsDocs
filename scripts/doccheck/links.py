@@ -7,6 +7,7 @@ from urllib.parse import unquote, urlsplit
 
 from markdown_it import MarkdownIt
 
+from .frontmatter import valid_port
 from .model import Issue
 
 
@@ -101,7 +102,7 @@ def local_target(root: Path, source: Path, href: str):
 def external_error(href: str):
     try:
         parsed = urlsplit(href)
-        if re.search(r"\s", href):
+        if re.search(r"\s", href) or not valid_port(parsed):
             return "URL externe invalide"
         if parsed.scheme in ("http", "https", "ftp", "ftps") and parsed.hostname:
             return None

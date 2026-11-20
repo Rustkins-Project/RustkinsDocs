@@ -172,11 +172,18 @@ def adr_graph(root, by_id):
 def historical(root: Path, base_ref: str, by_id):
     issues = []
     try:
-        listing = subprocess.run(["git", "ls-tree", "-r", "--name-only", base_ref, "--", "docs", "decisions", "knowledge"], cwd=root, text=True, encoding="utf-8", capture_output=True, check=True)
+        listing = subprocess.run(["git", "ls-tree", "-rz", "--name-only", base_ref, "--", "docs", "decisions", "knowledge"], cwd=root, capture_output=True, check=True)
     except (OSError, subprocess.CalledProcessError) as exc:
         return [Issue(".", None, "historique", f"base Git inaccessible ({base_ref}) : {exc}")]
     previous = {}
-    for path in listing.stdout.splitlines():
+    for raw_path in listing.stdout.split(b"\0"):
+        if not raw_path:
+            continue
+        try:
+            path = raw_path.decode("utf-8")
+        except UnicodeDecodeError:
+            issues.append(Issue(".", None, "historique", "chemin Git non encodé en UTF-8 dans la base"))
+            continue
         if not path.endswith(".md") or Path(path).name.lower() == "readme.md":
             continue
         try:
