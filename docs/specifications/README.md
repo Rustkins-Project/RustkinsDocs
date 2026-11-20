@@ -4,6 +4,8 @@ Décrivent **le comportement attendu** : règles fonctionnelles, contrats, forma
 
 ## Formats de pipeline
 
+- [Validation documentaire et CI](documentation-validation-ci.md)
+
 - [YAML v1 (périmètre Rustkins V0)](pipeline/yaml-v1.md)
 - [YAML v2 (périmètre Rustkins V1)](pipeline/yaml-v2.md)
 - [YAML v3 (périmètre Rustkins V2)](pipeline/yaml-v3.md)

@@ -39,12 +39,20 @@ Attention : **version de spécification YAML ≠ version du produit**.
 
 ## Domaines transversaux (entreprise et projet)
 
+- [Dossier entrepreneurial — plan du livrable](docs/cross-cutting/entrepreneurial-report/README.md)
+- [Présentation de Rustkins](docs/cross-cutting/company/project-presentation.md)
+- [Structure de l'entreprise Rustkins](docs/cross-cutting/company/company-structure.md)
+- [Business Model Canvas](docs/cross-cutting/business-model/business-model-canvas.md)
+- [Business plan Rustkins 2027–2030](docs/cross-cutting/business-model/business-plan.md)
 - [Index des domaines transversaux](docs/cross-cutting/README.md)
 - [RGPD et protection des données](docs/cross-cutting/gdpr/README.md)
 - [Compte rendu RGPD — 9 novembre 2026](docs/cross-cutting/gdpr/meeting-notes/2026-11-09-rgpd-meeting.md)
+- [Compréhension des attentes RGPD — Rustkins](docs/cross-cutting/gdpr/comprehension-attentes-rgpd.md)
 - [Modèle économique de Rustkins](docs/cross-cutting/business-model/business-model.md)
 - [Direction artistique](docs/cross-cutting/art-direction/README.md)
 - [Veille](docs/cross-cutting/technology-watch/README.md)
+- [Veille concurrentielle CI/CD](docs/cross-cutting/technology-watch/competitive-landscape.md)
+- [Veille technologique sur la stack](docs/cross-cutting/technology-watch/tech-stack-watch.md)
 - [Éco-conception](docs/cross-cutting/eco-design/README.md)
 - [Communication](docs/cross-cutting/communication/README.md)
 
@@ -60,9 +68,12 @@ Attention : **version de spécification YAML ≠ version du produit**.
 
 ## Contribuer
 
+- [Spécification de la validation documentaire et de la CI](docs/specifications/documentation-validation-ci.md)
+- [Utilisation locale du validateur](docs/conventions/knowledge-management.md#8-validation-locale-et-ci)
+
 - [Template ADR](templates/adr.md) · [Schéma ADR](schemas/adr.schema.json)
 - [Template connaissance](templates/knowledge.md) · [Schéma connaissance](schemas/knowledge.schema.json)
-- [Template runbook](templates/runbook.md)
+- [Template runbook](templates/runbook.md) · [Schéma runbook](schemas/runbook.schema.json)
 - [Template de document](templates/document.md) · [Schéma documentaire](schemas/document.schema.json)
 
 Les répertoires thématiques de connaissances et d'opérations sont créés **à la demande**, sans documents fictifs.

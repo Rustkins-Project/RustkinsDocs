@@ -5,6 +5,8 @@ Espace dédié aux obligations de l'entreprise Rustkins, à la conception du pro
 ## Documents disponibles
 
 - [Compte rendu du point RGPD du 9 novembre 2026](meeting-notes/2026-11-09-rgpd-meeting.md).
+- [Document de compréhension des attentes RGPD](comprehension-attentes-rgpd.md) — démarche interne de Rustkins et protection des données dans le produit.
+- [Version Word du document de compréhension — 13 novembre 2026](meeting-notes/2026-11-13-rustkins-comprehension-attentes-rgpd.doc).
 
 ## Livrables pédagogiques à préparer
 

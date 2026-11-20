@@ -116,6 +116,13 @@
           }
         }
       }
+    },
+    {
+      "if": {
+        "properties": {"applies_to": {"contains": {"const": "all"}}},
+        "required": ["applies_to"]
+      },
+      "then": {"properties": {"applies_to": {"maxItems": 1}}}
     }
   ]
 }

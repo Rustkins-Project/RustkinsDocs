@@ -4,7 +4,7 @@ La documentation du produit est regroupée dans `docs/` (architecture, conventio
 
 Référentiel documentaire et mémoire collective de **Rustkins** : spécifications, architecture, décisions, connaissances réutilisables, procédures et conventions. Les documents Markdown restent la source de vérité : l'index facilite leur découverte mais ne remplace pas leur contenu.
 
-**[Accéder à l'index de la documentation](INDEX.md)** · **[Règles de contribution et gouvernance](docs/conventions/knowledge-management.md)**
+**[Accéder à l'index de la documentation](INDEX.md)** · **[Règles de contribution, validation locale et gouvernance](docs/conventions/knowledge-management.md)**
 
 ## Où ranger une information ?
 
@@ -38,4 +38,4 @@ Référentiel documentaire et mémoire collective de **Rustkins** : spécificati
 
 Les documents historiques sont classés par nature. Utiliser [l'index](INDEX.md) pour retrouver les spécifications et références techniques.
 
-Les documents Markdown de référence sous `docs/` (hors fichiers `README.md`) possèdent des **métadonnées YAML visibles sur GitHub** (identifiant, statut, version du produit, sujets, résumé). Leur structure est définie par [le schéma documentaire](schemas/document.schema.json) et [le template](templates/document.md). Les `README.md` sont réservés à la navigation et ne portent aucune métadonnée. Les ADR et connaissances conservent leurs schémas dédiés.
+Les documents Markdown de référence sous `docs/` (hors fichiers `README.md`) possèdent des **métadonnées YAML visibles sur GitHub** (identifiant, statut, version du produit, sujets, résumé). Les documents classiques utilisent [le schéma documentaire](schemas/document.schema.json) et [le template](templates/document.md) ; les runbooks utilisent [leur schéma](schemas/runbook.schema.json) et [leur template](templates/runbook.md). Les `README.md` sont réservés à la navigation et ne portent aucune métadonnée. Les ADR et connaissances conservent leurs schémas dédiés. La [convention de documentation](docs/conventions/knowledge-management.md#8-validation-locale-et-ci) décrit les commandes de validation.
