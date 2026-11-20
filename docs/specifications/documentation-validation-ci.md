@@ -261,7 +261,7 @@ templates/
 .github/
   workflows/
     docs-validation.yml
-requirements-dev.txt
+requirements.txt
 ```
 
 Dépendances recommandées : `PyYAML`, `jsonschema`, `markdown-it-py`, `pytest`. Limiter strictement les dépendances ; utiliser la bibliothèque standard pour les fichiers, chemins, diffs locaux et diagnostics quand c'est suffisant.
@@ -285,7 +285,7 @@ Ne pas ajouter de serveur, de base de données, de cache distribué, de framewor
 Commandes minimales attendues :
 
 ```bash
-python -m pip install -r requirements-dev.txt
+python -m pip install -r requirements.txt
 python scripts/validate_docs.py
 python scripts/validate_docs.py --base-ref origin/main
 python -m pytest -q

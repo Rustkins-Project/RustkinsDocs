@@ -103,7 +103,7 @@ Ne pas créer de décisions rétrospectives sur la seule base d'un document tech
 Depuis la racine de RustkinsDocs, avec Python 3.13 :
 
 ```bash
-python -m pip install -r requirements-dev.txt
+python -m pip install -r requirements.txt
 python -m pytest -q
 python scripts/validate_docs.py
 python scripts/validate_docs.py --base-ref origin/main
