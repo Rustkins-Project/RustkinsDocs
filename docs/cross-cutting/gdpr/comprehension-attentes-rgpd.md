@@ -1,5 +1,5 @@
 ---
-id: DOC-0102
+id: DOC-0110
 title: "Document de compréhension des attentes RGPD — Rustkins"
 type: cross-cutting
 status: draft
@@ -7,8 +7,8 @@ summary: "Compréhension globale des attentes RGPD : démarche interne de Rustki
 topics: [gdpr, compliance, expectations, privacy, business-model]
 applies_to: [all]
 related_docs:
-  - "meeting-notes/2026-11-09-rgpd-meeting.md"
-  - "../business-model/business-model.md"
+  - DOC-0100
+  - DOC-0101
 ---
 
 PROJET RUSTKINS • DIIAGE 3 • 13 NOVEMBRE 2026
