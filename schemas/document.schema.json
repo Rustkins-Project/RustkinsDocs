@@ -29,7 +29,6 @@
         "architecture",
         "specification",
         "convention",
-        "operation",
         "project-management",
         "version",
         "cross-cutting"
@@ -91,7 +90,7 @@
       "uniqueItems": true,
       "items": {
         "type": "string",
-        "minLength": 1
+        "pattern": "^(DOC|RUN)-[0-9]{4,}$"
       }
     },
     "references": {

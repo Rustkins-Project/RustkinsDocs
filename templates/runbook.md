@@ -1,3 +1,13 @@
+---
+id: RUN-0000
+title: "Titre de la procédure"
+type: operation
+status: draft
+summary: "Procédure reproductible et vérifiable."
+topics: [operations]
+applies_to: [all]
+---
+
 # Titre de la procédure
 
 > **Périmètre :** environnement et composants concernés  
