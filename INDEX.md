@@ -68,9 +68,12 @@ Attention : **version de spécification YAML ≠ version du produit**.
 
 ## Contribuer
 
+- [Spécification de la validation documentaire et de la CI](docs/specifications/documentation-validation-ci.md)
+- [Utilisation locale du validateur](docs/conventions/knowledge-management.md#8-validation-locale-et-ci)
+
 - [Template ADR](templates/adr.md) · [Schéma ADR](schemas/adr.schema.json)
 - [Template connaissance](templates/knowledge.md) · [Schéma connaissance](schemas/knowledge.schema.json)
-- [Template runbook](templates/runbook.md)
+- [Template runbook](templates/runbook.md) · [Schéma runbook](schemas/runbook.schema.json)
 - [Template de document](templates/document.md) · [Schéma documentaire](schemas/document.schema.json)
 
 Les répertoires thématiques de connaissances et d'opérations sont créés **à la demande**, sans documents fictifs.

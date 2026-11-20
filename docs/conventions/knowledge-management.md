@@ -68,12 +68,13 @@ Les modifications structurantes des spécifications, de l'architecture et des co
 
 ## 5. Formats Markdown
 
-- Les ADR et les connaissances utilisent leurs schémas respectifs dans `schemas/`.
-- Les documents Markdown de référence sous `docs/` utilisent le frontmatter YAML de `schemas/document.schema.json` et le modèle `templates/document.md`, à l'exception de **tous les fichiers `README.md`**, réservés à la navigation et sans métadonnées. `README.md` et `INDEX.md` à la racine sont également exemptés. Un document métier ou normatif (comme la gestion de projet) utilise un nom dédié (`project-management.md`) plutôt que `README.md`.
+- Les ADR, connaissances et runbooks utilisent leurs schémas respectifs dans `schemas/`. Les runbooks sous `docs/operations/` portent un ID `RUN-xxxx`, `type: operation`, et suivent `templates/runbook.md`.
+- Les autres documents Markdown de référence sous `docs/` utilisent le frontmatter YAML de `schemas/document.schema.json` et le modèle `templates/document.md`, à l'exception de **tous les fichiers `README.md`**, réservés à la navigation et sans métadonnées. `README.md` et `INDEX.md` à la racine sont également exemptés. Un document métier ou normatif (comme la gestion de projet) utilise un nom dédié (`project-management.md`) plutôt que `README.md`.
 - Les métadonnées documentaires incluent `id`, `title`, `type`, `status`, `summary`, `topics` et `applies_to`. Les champs de références et `specification_version` sont facultatifs.
-- `applies_to` décrit la version **du produit Rustkins** ; `specification_version` peut décrire la version d'un contrat YAML distinct.
+- `applies_to` décrit la version **du produit Rustkins** : `V0`, `V1`, `V2`, `V3` ou `all` seul. `specification_version` peut décrire la version d'un contrat YAML distinct.
 - `draft` est le statut par défaut d'un document historique sans validation explicite ; `approved` exige une validation effective selon les règles d'équipe. Le fait d'être déjà dans `main` ne prouve pas à lui seul cette validation.
-- Les identifiants `DOC-xxxx` sont uniques et stables, y compris après retrait du frontmatter d'un ancien README : **ne pas réattribuer** un identifiant déjà utilisé. Le schéma vérifie la structure du frontmatter ; l'unicité, la validité des liens et les autorisations de revue nécessitent des contrôles complémentaires.
+- Les identifiants `DOC-xxxx`, `RUN-xxxx`, `ADR-xxxx` et `KNOW-xxxx` sont uniques et stables. Les valeurs `0000` sont réservées aux templates. Ne pas réattribuer un identifiant déjà publié, y compris après retrait du frontmatter d'un ancien README. Le validateur vérifie le frontmatter, l'unicité, les références et les liens ; les autorisations de revue restent du ressort de GitHub.
+- `related_docs` accepte uniquement les IDs `DOC-xxxx` et `RUN-xxxx` existants ; `related_adrs` accepte les IDs d'ADR. Les chemins de fichiers s'écrivent dans les liens Markdown. Les dates YAML sans guillemets sont normalisées en ISO-8601 par le validateur.
 - Les schémas JSON s'appliquent **aux objets résultant du parsing YAML**, pas au fichier Markdown brut.
 - Le corps doit présenter des faits précis, des limites et des références vérifiables.
 - Identifiants stables : `ADR-0001`, `KNOW-0001` (exemples) ; s'assurer qu'ils n'existent pas déjà.
@@ -96,3 +97,18 @@ Les modifications structurantes des spécifications, de l'architecture et des co
 Lors d'un déplacement ou d'une réorganisation, vérifier les liens Markdown relatifs, les images et les références croisées. Mettre à jour les liens utilisés par les scripts et autres repositories. Les anciennes URLs vers les fichiers ne sont pas nécessairement redirigées par GitHub.
 
 Ne pas créer de décisions rétrospectives sur la seule base d'un document technique, ni déclarer un ancien brouillon comme validé sans approbation.
+
+## 8. Validation locale et CI
+
+Depuis la racine de RustkinsDocs, avec Python 3.13 :
+
+```bash
+python -m pip install -r requirements-dev.txt
+python -m pytest -q
+python scripts/validate_docs.py
+python scripts/validate_docs.py --base-ref origin/main
+```
+
+La dernière commande requiert une référence `origin/main` disponible localement (`git fetch origin main`). Sans `--base-ref`, aucun accès à `main` n'est nécessaire. Le validateur inspecte tous les documents publiés, les templates et les pages de navigation ; `research/` est exclu. Il contrôle les fichiers locaux et les ancres, mais ne contacte jamais les URL externes. Les références vers des documents obsolètes sont signalées comme avertissements ; les erreurs donnent un code de sortie non nul. Le contrôle historique compare les IDs de la base et de la branche : un déplacement avec ID conservé passe. La continuité du sujet d'un document déplacé reste à apprécier en revue humaine.
+
+Le workflow `.github/workflows/docs-validation.yml` exécute les tests et la validation sur chaque PR vers `main`, avec comparaison des identités publiées au SHA de la base de la PR. Un push sur `main` relance la validation courante. Le job **Validate documentation** pourra être marqué comme required status check après recette par les administrateurs. La protection de `main`, l'interdiction des pushes directs et force-pushs et les reviewers humains ciblés pour `decisions/**` sont des réglages GitHub manuels. Ne pas imposer une revue aux connaissances.
