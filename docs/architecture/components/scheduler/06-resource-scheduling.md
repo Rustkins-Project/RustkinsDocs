@@ -6,6 +6,7 @@ status: draft
 summary: "Allocation et réservation de CPU et mémoire pour répartir les jobs entre workers sans dépasser leurs capacités."
 topics: [scheduler, resources, worker, cpu, memory]
 applies_to: [V1]
+related_adrs: [ADR-0001]
 ---
 
 # ARCH-06 --- Resource Scheduling (Rustkins V1)
@@ -45,10 +46,11 @@ PipelineRun --> Scheduler
 Scheduler --> PostgreSQL
 PostgreSQL --> OutboxPublisher
 OutboxPublisher --> RabbitMQ
-RabbitMQ --> Worker
+RabbitMQ -->|job.assigned| Worker
 Worker --> Docker
 
-Worker --> PostgreSQL
+Worker -->|events| RabbitMQ
+RabbitMQ -->|events| Scheduler
 ```
 
 The Scheduler is the only component allowed to decide where a job
@@ -151,12 +153,18 @@ participant Worker
 Scheduler->>PostgreSQL: Find compatible worker
 Scheduler->>PostgreSQL: Reserve CPU & Memory
 Scheduler->>PostgreSQL: JobRun = queued
-Scheduler->>PostgreSQL: Insert OutboxMessage(job.ready)
+Scheduler->>PostgreSQL: Insert OutboxMessage(job.assigned)
 
-Publisher->>RabbitMQ: Publish job.ready
+Publisher->>RabbitMQ: Publish job.assigned (worker.{id})
 RabbitMQ->>Worker: Job message
-Worker->>PostgreSQL: JobRun = running
+Worker->>RabbitMQ: job.start.requested
+RabbitMQ->>Scheduler: job.start.requested
+Scheduler->>PostgreSQL: JobRun = running
+Scheduler->>PostgreSQL: Insert OutboxMessage(job.start.accepted)
+RabbitMQ->>Worker: job.start.accepted
 ```
+
+The job is routed to the queue of the selected Worker only.
 
 Reservation and OutboxMessage creation occur in the same PostgreSQL
 transaction.
@@ -181,10 +189,13 @@ The Worker does not modify `reserved_cpu_milli` or
 
 Normal completion flow:
 
-1.  Worker updates the JobRun execution result.
-2.  Scheduler observes the final JobRun state.
+1.  Worker publishes `job.finished` with the execution result.
+2.  Scheduler validates the event and writes the final JobRun state.
 3.  Scheduler releases the reserved CPU and memory.
-4.  Scheduler unlocks dependent jobs or completes the PipelineRun.
+4.  Scheduler unlocks dependent jobs, assigns them to Workers, or
+    completes the PipelineRun.
+
+Steps 2 to 4 occur in the same transaction.
 
 Release occurs before any dependent JobRun is queued.
 
@@ -236,11 +247,15 @@ This prevents one container from consuming the entire machine.
 
 # 11. Worker Heartbeat
 
-Workers periodically update:
+Workers periodically publish a `worker.heartbeat` event on
+`rustkins.events`. The Scheduler updates:
 
 ``` text
 last_heartbeat_at
 ```
+
+At startup, a Worker publishes `worker.registered` with its CPU and
+memory capacity. The Scheduler creates or updates the WorkerNode.
 
 If heartbeat timeout expires:
 
@@ -252,7 +267,8 @@ Consequences
 
 -   no new jobs assigned
 -   reserved resources released by the Scheduler
--   running jobs evaluated for retry
+-   jobs checked against durable start authorization: only those never
+    authorized can be retried automatically
 
 ------------------------------------------------------------------------
 
@@ -263,23 +279,39 @@ flowchart TD
 
 WorkerCrash --> HeartbeatTimeout
 HeartbeatTimeout --> ReleaseResources
-ReleaseResources --> Retry
-
-Retry --> RemainingAttempts
-RemainingAttempts --> DeadLetter
+ReleaseResources --> Authorized{Start authorized?}
+Authorized -->|No| RetryOrDeadLetter
+Authorized -->|Yes| Policy{worker_loss: unsafe?}
+Policy -->|No| Indeterminate
+Policy -->|Yes, attempts remain| Retry
+Policy -->|Yes, exhausted| Indeterminate
 ```
 
-If retry attempts remain:
+If start was never authorized and retry attempts remain:
 
 ``` text
 JobRun = retrying
 ```
 
-Otherwise
+If start was never authorized and attempts are exhausted:
 
 ``` text
 JobRun = dead_lettered
 ```
+
+If start was authorized and no final event was confirmed, by default:
+
+``` text
+JobRun = indeterminate
+```
+
+By default, no new attempt is assigned. The original Worker's late
+result may resolve the JobRun. With YAML v2
+`retry.worker_loss: unsafe`, the old attempt remains `indeterminate`
+in the audit history and a new attempt is assigned if the global
+three-attempt limit allows it. A late result from the old attempt
+cannot overwrite the current one. The offline Worker receives no new
+assignments until its existing containers are reconciled.
 
 ------------------------------------------------------------------------
 
@@ -359,6 +391,7 @@ queued
 running
 retrying
 dead_lettered
+indeterminate
 ```
 
 ------------------------------------------------------------------------
@@ -367,7 +400,10 @@ dead_lettered
 
 ## Worker offline
 
-Retry if attempts remain.
+Retry by default only if start was never authorized. Otherwise mark
+the job `indeterminate` and wait for the original result or operator
+review. YAML v2 `retry.worker_loss: unsafe` permits a new attempt
+after authorized Worker loss if attempts remain.
 
 ------------------------------------------------------------------------
 
@@ -387,13 +423,18 @@ JobRun remains queued with reserved resources.
 
 Outbox Publisher retries publication later.
 
+Worker events and heartbeats are delayed; the heartbeat timeout must
+tolerate short broker outages.
+
 ------------------------------------------------------------------------
 
 ## Docker unavailable
 
 Infrastructure failure.
 
-Retry policy applies.
+Retry automatically only if the failure is known to precede start
+authorization. Once authorization exists, no new attempt is dispatched
+without checking the outcome.
 
 ------------------------------------------------------------------------
 
@@ -459,3 +500,12 @@ Candidates
 -   Load balancing
 -   GPU resources
 -   Dynamic worker capacity
+-   Reserved vs actual resource usage per job, with sizing suggestions
+-   Worker `draining` state (finish running jobs, accept no new ones)
+-   Time-based capacity profiles (workers accepting jobs per time slot)
+-   Capacity signals for external autoscalers (sustained
+    `waiting_resources`, idle workers)
+
+Any load balancing strategy must keep the ability to consolidate jobs
+on a subset of workers, so that idle workers can be stopped. See the
+[eco-design approach](../../../cross-cutting/eco-design/eco-design-approach.md).

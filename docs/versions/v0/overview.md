@@ -124,7 +124,7 @@ La V0 doit rester volontairement limitée. L'objectif n'est pas encore de faire 
 |---|---|
 | Déploiement dev | Docker Compose local |
 | Déploiement V0 cible | VM unique mononode |
-| Orchestration prod V0 | Docker Compose ou Swarm mono-node |
+| Orchestration du pilote V0 | Docker Compose ou Swarm mono-node, sans isolation forte des workers |
 | Exposition HTTP | Traefik devant UI/API |
 | HTTPS | Hors V0, HTTP au début |
 | Git | Dépôts publics uniquement |
@@ -160,7 +160,6 @@ flowchart TD
   Scheduler --> MQ
 
   Worker[Worker container] --> MQ
-  Worker --> PG
   Worker --> FS
   Worker --> Git
   Worker --> DockerSocket[/Docker socket/]
@@ -236,7 +235,6 @@ flowchart TD
     Scheduler --> MQ
 
     Worker --> MQ
-    Worker --> PG
     Worker --> FS
     Worker --> DockerSock[/var/run/docker.sock/]
 
@@ -372,6 +370,13 @@ Accès requis : lecture/écriture.
 ### 9.3 API → RabbitMQ
 
 L'API publie un message lorsqu'un utilisateur déclenche un run.
+Elle enregistre d'abord le `pipeline_run` en `pending` dans PostgreSQL,
+puis publie `PipelineRunRequested` comme message persistant avec
+confirmation RabbitMQ. Ce message réveille le Scheduler ; il ne constitue
+pas l'unique trace du run demandé. Le Scheduler recherche aussi les runs
+`pending` en base au démarrage et périodiquement.
+Le traitement d'un même `run_id` est idempotent si l'annonce est
+redélivrée.
 
 Exemple de message `PipelineRunRequested` :
 
@@ -396,30 +401,59 @@ Le Scheduler lit :
 - les dépendances `needs` ;
 - les statuts des jobs terminés.
 
+Il réconcilie périodiquement les runs `pending` et les jobs `queued`,
+ainsi qu'au démarrage, même si aucun nouveau message RabbitMQ n'arrive.
+
 Le Scheduler écrit :
 
 - les jobs prêts en statut `queued` ;
-- les runs en statut `running`, `success` ou `failed` ;
+- les runs en statut `running`, `success`, `failed` ou `indeterminate` ;
 - les jobs dépendants en `skipped` en cas de fail-fast.
 
 ---
 
 ### 9.5 Scheduler → RabbitMQ
 
-Quand un job est prêt, le Scheduler publie un message `JobRunRequested`.
+Quand un job est prêt, le Scheduler publie un ordre autonome
+`job.assigned`. Il résout les données nécessaires avant publication :
+le Worker ne peut pas les relire dans PostgreSQL.
 
 ```json
 {
-  "run_id": "uuid",
-  "job_run_id": "uuid"
+  "type": "job.assigned",
+  "pipeline_run_id": "uuid",
+  "job_run_id": "uuid",
+  "worker_id": "uuid",
+  "attempt": 1,
+  "repository": { "url": "https://git.example.com/org/repo.git", "commit_sha": "sha" },
+  "job": {
+    "image": "node:22",
+    "timeout_seconds": 3600,
+    "steps": [ { "index": 0, "run": "npm run build" } ]
+  },
+  "log_key": "runs/{pipeline_run_id}/jobs/{job_run_id}/logs.txt"
 }
 ```
+
+La V0 n'a ni artefacts amont ni réservation multi-worker. Le contrat
+contient néanmoins l'image, les steps, le SHA et la clé du log ; aucun
+de ces champs ne dépend d'une lecture de base par le Worker.
+Le `worker_id` correspond à l'unique `WORKER_V0_ID` configuré.
+La V0 utilise une file durable de jobs et une file durable de contrôle
+pour ce seul Worker.
+
+Le Scheduler publie directement `job.assigned` comme message persistant
+dans une file durable et attend la confirmation RabbitMQ. Au démarrage
+et périodiquement, il reprend les jobs encore `queued` et republie leur
+ordre si nécessaire. Un ordre déjà livré peut alors être
+dupliqué ; l'autorisation de démarrer empêche ces livraisons d'exécuter
+deux fois la même tentative.
 
 ---
 
 ### 9.6 Worker → RabbitMQ
 
-Le Worker consomme les messages `JobRunRequested`.
+Le Worker consomme les messages `job.assigned`.
 
 Règles V0 recommandées :
 
@@ -428,20 +462,33 @@ Règles V0 recommandées :
 - messages persistants
 - ack manuel
 - retry limité
+- retry automatique uniquement avant l'autorisation de démarrer ; après perte du Worker autorisé sans résultat confirmé, `indeterminate` et vérification humaine avant relance
 - dead-letter queue pour erreurs techniques
 ```
 
+Le Worker publie `job.start.requested` puis attend l'autorisation du Scheduler
+avant de lancer Docker. Il acquitte `job.assigned` après confirmation
+par RabbitMQ de `job.finished` ; un refus de démarrage est acquitté sans
+exécution. Aucun registre de déduplication ni spool durable n'est tenu
+sur le Worker.
+
+La V0 ne possède pas l'option YAML v2 `retry.worker_loss`. Si le
+Worker disparaît après l'autorisation sans résultat confirmé, le
+Scheduler passe le job et le run à `indeterminate` et bloque les jobs
+dépendants. Un `job.finished` tardif authentifié peut résoudre cet état.
+Le Scheduler ne relance pas automatiquement cette tentative.
+
 ---
 
-### 9.7 Worker → PostgreSQL
+### 9.7 Worker → Scheduler
 
-Le Worker met à jour :
+Le Worker n'accède pas à PostgreSQL ([ADR-0001](../../../decisions/ADR-0001-worker-scheduler-communication.md)). Il publie `job.start.requested` (`job_run_id`, `attempt`, `start_request_id`) comme message persistant avec confirmation RabbitMQ. Le Scheduler le consomme avec ACK manuel dans une file durable. Il vérifie le compte du seul Worker V0 configuré, le numéro de tentative et le statut `queued`, puis enregistre `running` et le `start_request_id` dans `job_runs`. Ce commit autorise durablement la tentative, même si le Worker attend encore la réponse.
 
-- le statut du job ;
-- le statut des steps ;
-- les timestamps `started_at` / `finished_at` ;
-- les codes de retour ;
-- la référence du fichier de logs dans RustFS.
+Le Scheduler publie directement `job.start.accepted` avec le même ID dans la file de contrôle durable du Worker. Il attend la confirmation RabbitMQ avant d'ACK la demande. Si la publication ou l'ACK échoue, la demande redélivrée avec le même ID reçoit à nouveau l'acceptation tant que la tentative est encore active, sans nouvelle autorisation. Une demande différente ou périmée reçoit `job.start.rejected`, également confirmé avant l'ACK. Le Worker n'exécute le job qu'après l'acceptation correspondant à sa demande en attente. Un retry avant autorisation incrémente `attempt_number` et remet `start_request_id` à `null` avant un nouvel ordre `job.assigned`.
+
+Le Worker envoie ensuite `job.finished` (`job_run_id`, `attempt`, statut, code de retour, horodatages, `log_key`). Le Scheduler valide et écrit le résultat, puis publie les jobs suivants. Les événements confirmés restent dans une file durable jusqu'à l'ACK du Scheduler après commit.
+
+La V0 ne possède ni table d'outbox ni publisher associé. La V1 spécifie cette garantie supplémentaire pour ses ordres et contrôles dans [ARCH-02](../../architecture/components/messaging/02-rabbitmq-architecture.md).
 
 ---
 
@@ -619,6 +666,8 @@ erDiagram
     string name
     string image
     string status
+    int attempt_number
+    uuid start_request_id
     json needs_json
     int exit_code
     string log_object_key
@@ -724,12 +773,17 @@ Représente l'exécution d'un job du pipeline.
 | `name` | text | Nom affiché |
 | `image` | text | Image Docker utilisée |
 | `status` | text | Statut |
+| `attempt_number` | int | Tentative courante, incrémentée uniquement avant une nouvelle autorisation |
+| `start_request_id` | uuid, nullable | Demande acceptée pour la tentative courante ; `null` avant autorisation |
 | `needs_json` | jsonb | Dépendances |
 | `exit_code` | int | Code de retour global du job |
 | `log_object_key` | text | Clé RustFS des logs |
 | `log_expired` | boolean | Logs supprimés ou non |
 | `started_at` | timestamp | Début |
 | `finished_at` | timestamp | Fin |
+
+La V0 ne conserve que la tentative courante dans `job_runs` ;
+l'historique des tentatives distinctes arrive en V1.
 
 ---
 
@@ -761,6 +815,7 @@ running
 success
 failed
 skipped
+indeterminate
 canceled
 ```
 
@@ -793,33 +848,61 @@ sequenceDiagram
   API->>PG: Crée pipeline_version
   API->>PG: Crée pipeline_run, job_runs, step_runs
   API->>MQ: Publie PipelineRunRequested
+  MQ-->>API: Confirme la publication
   API-->>UI: Run créé
 
   Scheduler->>MQ: Consomme ou observe le run demandé
   Scheduler->>PG: Lit jobs pending + needs
   Scheduler->>PG: Marque build queued
-  Scheduler->>MQ: Publie JobRunRequested(build)
+  Scheduler->>MQ: Publie job.assigned(build)
+  MQ-->>Scheduler: Confirme la publication
 
-  Worker->>MQ: Consomme JobRunRequested(build)
-  Worker->>PG: Marque build running
+  Worker->>MQ: Consomme job.assigned(build)
+  Worker->>Docker: Vérifie la disponibilité du démon (sans exécuter le dépôt)
+  Worker->>MQ: Publie job.start.requested(build)
+  MQ-->>Worker: Confirme la demande
+  MQ->>Scheduler: Livre job.start.requested(build)
+  Scheduler->>PG: Valide et inscrit running + start_request_id
+  Scheduler->>MQ: Publie job.start.accepted(build) persistant
+  MQ-->>Scheduler: Confirme la publication
+  Scheduler->>MQ: ACK job.start.requested(build)
+  MQ->>Worker: Livre job.start.accepted(build)
   Worker->>Git: Clone repo au SHA
   Worker->>Docker: Pull image node:22
   Worker->>Docker: Create/start container
   Docker->>Job: Exécute npm install puis npm run build
   Worker->>FS: Écrit logs build
-  Worker->>PG: Marque build success/failed
-  Worker->>MQ: Ack message
+  Worker->>MQ: Publie job.finished(build)
+  MQ-->>Worker: Confirme la publication
+  Worker->>MQ: ACK job.assigned(build)
+  MQ->>Scheduler: Livre job.finished(build)
 
+  Scheduler->>PG: Marque build success/failed
+  Scheduler->>MQ: ACK job.finished(build) après commit
   Scheduler->>PG: Détecte test prêt si build success
   Scheduler->>PG: Marque test queued
-  Scheduler->>MQ: Publie JobRunRequested(test)
+  Scheduler->>MQ: Publie job.assigned(test)
+  MQ-->>Scheduler: Confirme la publication
 
-  Worker->>MQ: Consomme JobRunRequested(test)
-  Worker->>PG: Marque test running
+  Worker->>MQ: Consomme job.assigned(test)
+  Worker->>Docker: Vérifie la disponibilité du démon (sans exécuter le dépôt)
+  Worker->>MQ: Publie job.start.requested(test)
+  MQ-->>Worker: Confirme la demande
+  MQ->>Scheduler: Livre job.start.requested(test)
+  Scheduler->>PG: Valide et inscrit running + start_request_id
+  Scheduler->>MQ: Publie job.start.accepted(test) persistant
+  MQ-->>Scheduler: Confirme la publication
+  Scheduler->>MQ: ACK job.start.requested(test)
+  MQ->>Worker: Livre job.start.accepted(test)
   Worker->>Docker: Create/start container
   Docker->>Job: Exécute npm test
   Worker->>FS: Écrit logs test
-  Worker->>PG: Marque test success/failed
+  Worker->>MQ: Publie job.finished(test)
+  MQ-->>Worker: Confirme la publication
+  Worker->>MQ: ACK job.assigned(test)
+  MQ->>Scheduler: Livre job.finished(test)
+  Scheduler->>PG: Marque test success/failed
+  Scheduler->>MQ: ACK job.finished(test) après commit
 
   Scheduler->>PG: Calcule statut final du run
   UI->>API: GET /api/runs/{id}
@@ -917,8 +1000,8 @@ services:
   worker:
     image: rustkins/worker:dev
     environment:
-      DATABASE_URL: postgres://rustkins:rustkins@postgres:5432/rustkins
-      RABBITMQ_URL: amqp://rustkins:rustkins@rabbitmq:5672
+      WORKER_ID: ${WORKER_V0_ID}
+      RABBITMQ_URL: ${RABBITMQ_WORKER_V0_URL}
       RUSTFS_ENDPOINT: http://rustfs:9000
       RUSTFS_ACCESS_KEY: rustkins
       RUSTFS_SECRET_KEY: rustkins-password
@@ -927,11 +1010,10 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - worker_workdir:/workdir
     depends_on:
-      - postgres
       - rabbitmq
       - rustfs
     networks:
-      - rustkins-private
+      - rustkins-worker
 
   postgres:
     image: postgres:16
@@ -955,6 +1037,7 @@ services:
       - rabbitmq_data:/var/lib/rabbitmq
     networks:
       - rustkins-private
+      - rustkins-worker
 
   rustfs:
     image: rustfs/rustfs:latest
@@ -968,6 +1051,7 @@ services:
       - rustfs_data:/data
     networks:
       - rustkins-private
+      - rustkins-worker
 
 volumes:
   postgres_data:
@@ -978,13 +1062,21 @@ volumes:
 networks:
   rustkins-public:
   rustkins-private:
+  rustkins-worker:
 ```
+
+Le réseau du Worker donne accès à RabbitMQ et RustFS, sans route directe
+vers PostgreSQL. Sur cet hôte unique, le socket Docker monté dans le
+Worker peut toutefois contourner cette séparation : cette configuration
+sert au développement local, pas à une garantie d'isolation forte.
+`RABBITMQ_WORKER_V0_URL` utilise un compte propre au Worker, provisionné
+avec les droits définis dans [ARCH-02 §9](../../architecture/components/messaging/02-rabbitmq-architecture.md#9-worker-events).
 
 ---
 
-## 15. Exemple Swarm mono-node pour prod V0
+## 15. Exemple Swarm mono-node pour le pilote V0
 
-La prod V0 peut être déployée sur une VM unique avec Docker Swarm initialisé en mono-node.
+Le pilote V0 peut être déployé sur une VM unique avec Docker Swarm initialisé en mono-node. Ce montage ne convient pas à une production exécutant du code de dépôt non fiable : le Worker partage l'hôte Docker du plan de contrôle. Une telle production exige des hôtes distincts.
 
 ```bash
 docker swarm init
@@ -1072,8 +1164,8 @@ services:
   worker:
     image: rustkins/worker:v0
     environment:
-      DATABASE_URL: postgres://rustkins:rustkins@postgres:5432/rustkins
-      RABBITMQ_URL: amqp://rustkins:rustkins@rabbitmq:5672
+      WORKER_ID: ${WORKER_V0_ID}
+      RABBITMQ_URL: ${RABBITMQ_WORKER_V0_URL}
       RUSTFS_ENDPOINT: http://rustfs:9000
       RUSTFS_ACCESS_KEY: rustkins
       RUSTFS_SECRET_KEY: rustkins-password
@@ -1082,7 +1174,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - worker_workdir:/workdir
     networks:
-      - private
+      - workers
     deploy:
       replicas: 1
       placement:
@@ -1119,6 +1211,7 @@ services:
       - rabbitmq_data:/var/lib/rabbitmq
     networks:
       - private
+      - workers
     deploy:
       replicas: 1
       placement:
@@ -1140,6 +1233,7 @@ services:
       - rustfs_data:/data
     networks:
       - private
+      - workers
     deploy:
       replicas: 1
       placement:
@@ -1157,7 +1251,13 @@ networks:
     driver: overlay
   private:
     driver: overlay
+  workers:
+    driver: overlay
 ```
+
+En V0 mono-node, ce réseau sépare les conteneurs mais le socket Docker
+du Worker garde les privilèges du démon de l'hôte. L'isolation forte du
+plan de contrôle exige des hôtes distincts.
 
 Déploiement :
 
@@ -1167,7 +1267,7 @@ docker stack deploy -c stack.v0.yml rustkins
 
 ---
 
-## 16. Différence Compose dev / Swarm prod V0
+## 16. Différence Compose dev / Swarm pilote V0
 
 | Sujet | Compose dev | Swarm mono-node V0 |
 |---|---|---|
@@ -1208,7 +1308,6 @@ SCHEDULER_POLL_INTERVAL_SECONDS
 ### Worker
 
 ```txt
-DATABASE_URL
 RABBITMQ_URL
 RUSTFS_ENDPOINT
 RUSTFS_ACCESS_KEY
@@ -1364,6 +1463,11 @@ La V0 est considérée comme validée si :
 18. Les données PostgreSQL survivent à un redémarrage des conteneurs.
 19. Les logs RustFS survivent à un redémarrage des conteneurs.
 20. La stack peut être lancée sur une VM V0 mononode.
+21. Un `job.assigned` redélivré n'exécute pas deux fois la même tentative.
+22. Si le Scheduler tombe après avoir enregistré l'autorisation mais avant d'avoir confirmé la réponse, la demande redélivrée reçoit la même acceptation sans nouvelle autorisation.
+23. La perte d'un Worker après autorisation sans résultat confirmé laisse le job et le run `indeterminate`, sans retry automatique.
+24. Un run `pending` reste planifiable après perte de son annonce RabbitMQ : le Scheduler le reprend depuis PostgreSQL.
+25. Un job `queued` dont l'ordre n'a pas été confirmé est republié sans autoriser une seconde exécution de la même tentative.
 
 ---
 

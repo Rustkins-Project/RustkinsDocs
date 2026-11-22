@@ -50,7 +50,8 @@ Worker --> TarArchive
 TarArchive --> RustFS
 RustFS --> Worker
 
-Worker --> PostgreSQL
+Worker -->|job.finished with metadata| Scheduler
+Scheduler --> PostgreSQL
 
 Browser --> API
 API --> RustFS
@@ -96,7 +97,10 @@ At the end of execution the Worker:
 2.  validates paths
 3.  archives files
 4.  uploads archive to RustFS
-5.  creates metadata in PostgreSQL
+5.  includes the Artifact metadata in its `job.finished` event
+
+The Scheduler validates the event and creates the Artifact metadata in
+PostgreSQL. Workers never access PostgreSQL.
 
 ------------------------------------------------------------------------
 
@@ -228,8 +232,10 @@ Restore scope
 
 Restore sequence
 
-1.  Worker loads dependency JobRuns from PostgreSQL.
-2.  Worker lists available Artifact metadata for these JobRuns.
+1.  Scheduler resolves the dependency JobRuns and their Artifact
+    metadata when it assigns the job.
+2.  Scheduler includes the list (`restore_artifacts`: artifact id,
+    RustFS key, SHA-256) in the `job.assigned` message.
 3.  Worker downloads artifact archives from RustFS.
 4.  Worker verifies SHA-256 checksums.
 5.  Worker extracts archives into the job workspace.
@@ -311,7 +317,7 @@ Worker
 -   archive files
 -   calculate checksum
 -   upload archive
--   create Artifact metadata
+-   report Artifact metadata in `job.finished`
 -   restore upstream artifact archives before dependent job execution
 
 Worker never deletes artifacts.
@@ -339,19 +345,23 @@ Archive content is never stored in PostgreSQL.
 
 Retryable.
 
-Worker retries according to runtime retry policy.
+The live Worker may retry this transfer. A full job replay after
+authorized Worker loss still follows `retry.worker_loss`.
 
 ------------------------------------------------------------------------
 
 ## RustFS unavailable
 
-Retry.
+The live Worker retries the transfer. A full job replay after
+authorized Worker loss still follows `retry.worker_loss`.
 
 ------------------------------------------------------------------------
 
 ## Restore failure
 
-Infrastructure restore failures are retryable.
+Infrastructure restore failures may be retried by a live Worker.
+After authorized Worker loss, a full job replay requires YAML v2
+`retry.worker_loss: unsafe`; otherwise the outcome is `indeterminate`.
 
 Examples:
 
@@ -389,7 +399,7 @@ No retry.
 
 Archive discarded.
 
-Metadata not created.
+Metadata not reported, therefore not created.
 
 ------------------------------------------------------------------------
 

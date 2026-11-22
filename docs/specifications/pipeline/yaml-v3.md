@@ -56,6 +56,7 @@ La version 3 conserve les concepts des versions précédentes :
 * `needs`
 * `run_if`
 * `optional`
+* `retry.worker_loss`
 * `resources`
 * `timeout`
 * `steps`
@@ -906,6 +907,14 @@ jobs:
 * chaque job doit avoir une image résolue ;
 * chaque job doit contenir au moins une step.
 
+La version 3 conserve `retry.worker_loss` de la
+[spécification v2](yaml-v2.md#102-relance-après-perte-du-worker) : `never`
+par défaut ou `unsafe` sur choix explicite du job. Cette option ne
+concerne que la perte d'un Worker après l'enregistrement durable de
+l'autorisation de démarrer, même si `job.start.accepted` n'a pas encore
+été livré, sans résultat confirmé. `job.start.rejected` ne déclenche
+aucune exécution.
+
 ### Nom affiché
 
 La version 3 permet un nom lisible distinct de l'identifiant :
@@ -1432,7 +1441,10 @@ optional: true
 
 Un job optionnel qui rencontre une erreur métier termine en `warning` au lieu de `failed`.
 
-Une erreur d'infrastructure peut toujours déclencher les mécanismes de retry.
+Une erreur d'infrastructure connue avant l'autorisation de démarrer
+peut déclencher le retry automatique. Après la perte d'un Worker déjà
+autorisé sans résultat confirmé, `retry.worker_loss` s'applique,
+indépendamment de `optional`.
 
 Valeur par défaut :
 
@@ -2189,8 +2201,12 @@ Exemples :
 
 Comportement :
 
-* retry selon la politique runtime ;
-* passage possible en `dead_lettered`.
+* retry avant autorisation de démarrer selon la politique runtime ;
+* après perte d'un Worker autorisé sans résultat confirmé :
+  `indeterminate` par défaut, ou nouvelle tentative avec
+  `retry.worker_loss: unsafe` et des tentatives restantes ;
+* passage possible en `dead_lettered` après épuisement des tentatives
+  pour les pannes antérieures à l'autorisation.
 
 ### Erreur de configuration
 
@@ -2219,6 +2235,7 @@ success
 warning
 failed
 cancelled
+indeterminate
 ```
 
 ### JobRun
@@ -2238,6 +2255,7 @@ cancel_requested
 cancelled
 retrying
 dead_lettered
+indeterminate
 ```
 
 ### Service runtime
@@ -2297,6 +2315,7 @@ job.image = "node:22"
 job.needs = []
 job.run_if = all_success
 job.optional = false
+job.retry.worker_loss = never
 job.timeout = default_timeout
 job.resources = default_resources
 job.vars = merge(global_vars, job_vars)
@@ -2518,6 +2537,9 @@ jobs:
 
     optional: boolean
 
+    retry:
+      worker_loss: never | unsafe
+
     vars:
       KEY: string
 
@@ -2734,6 +2756,7 @@ La spécification v3 est considérée correctement implémentée si :
 56. Les valeurs `matrix`, `inputs` et `vars` sont interpolées.
 57. Les expressions libres sont rejetées.
 58. Les jobs de déploiement Kubernetes et Swarm peuvent être réalisés avec des CLI ordinaires.
+59. La politique `retry.worker_loss` héritée de v2 garde `never` par défaut et n'autorise la relance d'un Worker perdu après autorisation durable du démarrage qu'avec `unsafe` explicite.
 
 ---
 
