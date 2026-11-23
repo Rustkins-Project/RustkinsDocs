@@ -77,7 +77,8 @@ VersionJob --> VersionStep
 PipelineVersion --> PipelineRun
 
 PipelineRun --> JobRun
-JobRun --> StepRun
+JobRun --> JobRunAttempt
+JobRunAttempt --> StepRun
 ```
 
 Pipeline definitions are immutable.
@@ -97,7 +98,8 @@ PROJECT
       │      │      └── PIPELINE_VERSION_JOB_DEPENDENCY
       │      └── PIPELINE_RUN
       │             ├── JOB_RUN
-      │             └── STEP_RUN
+      │             │     └── JOB_RUN_ATTEMPT
+      │             │            └── STEP_RUN
 ```
 
 ------------------------------------------------------------------------
@@ -125,6 +127,7 @@ Fields
 -   git_sha
 -   yaml_hash
 -   yaml_content
+-   specification_version (YAML contract version)
 -   validation_status
 -   validation_errors
 
@@ -258,6 +261,7 @@ StepRun references
 
 ``` text
 PIPELINE_VERSION_STEP
+JOB_RUN_ATTEMPT
 ```
 
 Stores
@@ -267,6 +271,9 @@ Stores
 -   timestamps
 
 No command duplication exists.
+
+Each attempt has its own StepRun records, so retries preserve the
+earlier step outcomes.
 
 ------------------------------------------------------------------------
 

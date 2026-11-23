@@ -586,7 +586,8 @@ Le Scheduler construit le DAG runtime et prend les décisions d'ordonnancement.
 
 Le Scheduler :
 
-- crée les `JobRun` et `StepRun` ;
+- crée les `JobRun`, puis les `JobRunAttempt` et leurs `StepRun` à chaque
+  tentative ;
 - évalue le DAG ;
 - réserve CPU/RAM ;
 - passe les jobs en `queued` ;
@@ -771,6 +772,7 @@ erDiagram
   PROJECT ||--o{ PROJECT_MEMBER : has
   PROJECT ||--o{ API_TOKEN : owns
   PROJECT ||--o{ WEBHOOK_CONFIG : owns
+  PROJECT ||--o{ WEBHOOK_DELIVERY : receives
   WEBHOOK_CONFIG ||--o{ WEBHOOK_DELIVERY : receives
 
   PROJECT ||--o{ PIPELINE : owns
@@ -780,9 +782,12 @@ erDiagram
   PIPELINE_VERSION_JOB ||--o{ PIPELINE_VERSION_JOB_DEPENDENCY : has
 
   PIPELINE_VERSION ||--o{ PIPELINE_RUN : used_by
+  USER o|--o{ PIPELINE_RUN : triggers
+  API_TOKEN o|--o{ PIPELINE_RUN : triggers
+  WEBHOOK_DELIVERY o|--o{ PIPELINE_RUN : triggers
   PIPELINE_RUN ||--o{ JOB_RUN : contains
-  JOB_RUN ||--o{ STEP_RUN : contains
   JOB_RUN ||--o{ JOB_RUN_ATTEMPT : has
+  JOB_RUN_ATTEMPT ||--o{ STEP_RUN : contains
   JOB_RUN ||--o| JOB_LOG_STREAM : writes
   JOB_RUN ||--o{ ARTIFACT : produces
   WORKER_NODE ||--o{ JOB_RUN : executes
@@ -847,7 +852,7 @@ Permet l'automatisation par projet.
 | `name` | Nom du token |
 | `token_prefix` | Préfixe affichable |
 | `token_hash` | Token hashé |
-| `scopes` | Scopes autorisés |
+| `scopes_json` | Tableau JSON des scopes autorisés |
 | `revoked` | Révocation |
 | `expires_at` | Expiration optionnelle |
 | `last_used_at` | Dernière utilisation |
@@ -875,7 +880,8 @@ Historique des webhooks reçus.
 |---|---|
 | `external_delivery_id` | Identifiant provider |
 | `event_type` | Type d'événement |
-| `commit_sha` | Commit reçu |
+| `before_sha` | Commit précédent de la référence poussée |
+| `after_sha` | Nouveau commit, utilisé pour le run |
 | `branch` | Branche reçue |
 | `status` | `received`, `validated`, `processed`, `completed`, `rejected` |
 | `error_message` | Erreur éventuelle |
@@ -892,6 +898,7 @@ Snapshot immuable d'un YAML.
 | `git_sha` | SHA Git |
 | `yaml_hash` | Hash du YAML |
 | `yaml_content` | YAML brut |
+| `specification_version` | Version du contrat YAML, distincte de la version du produit |
 | `validation_status` | `valid` ou `invalid` |
 | `validation_errors_json` | Erreurs de validation |
 
@@ -942,8 +949,9 @@ Exécution complète d'une version.
 | Colonne | Description |
 |---|---|
 | `pipeline_version_id` | Version utilisée |
-| `triggered_by_user_id` | Utilisateur déclencheur |
-| `webhook_delivery_id` | Webhook déclencheur |
+| `triggered_by_user_id` | Utilisateur déclencheur, si `manual` |
+| `triggered_by_api_token_id` | Token déclencheur, si `api` |
+| `webhook_delivery_id` | Livraison déclencheuse, si `webhook` |
 | `cancelled_by_user_id` | Utilisateur ayant annulé |
 | `trigger_type` | `manual`, `api`, `webhook` |
 | `status` | Statut runtime |
@@ -952,6 +960,9 @@ Exécution complète d'une version.
 | `commit_message` | Message du commit |
 | `author_name` | Auteur |
 | `author_email` | Email auteur |
+
+Une seule des trois références de déclenchement est renseignée, selon
+`trigger_type`.
 
 ---
 
@@ -969,6 +980,20 @@ Exécution runtime d'un job.
 | `attempt_count` | Nombre de tentatives |
 | `max_attempts` | Tentatives max |
 | `exit_code` | Code de retour |
+
+`worker_node_id` indique l'affectation courante ; chaque tentative conserve
+son propre worker pour l'historique.
+
+---
+
+#### `job_run_attempts` et `step_runs`
+
+Une tentative conserve son `worker_node_id`, son `attempt_number`, son
+`start_request_id` éventuel, son `status`, son `exit_code`, ses dates et
+ses métriques CPU/mémoire. Chaque `step_run` référence cette tentative
+via `job_run_attempt_id` et la définition via
+`pipeline_version_step_id`. Les résultats des steps restent ainsi
+distincts entre deux tentatives du même job.
 
 ---
 
@@ -1115,11 +1140,11 @@ sequenceDiagram
   API->>PG: Crée ou réutilise PipelineVersion
   API->>Scheduler: Demande création PipelineRun
 
-  Scheduler->>PG: Crée PipelineRun, JobRuns, StepRuns
+  Scheduler->>PG: Crée PipelineRun et JobRuns
   Scheduler->>PG: Évalue DAG
   Scheduler->>PG: Sélectionne worker compatible
   Scheduler->>PG: Réserve CPU/RAM
-  Scheduler->>PG: JobRun = queued + OutboxMessage(job.assigned)
+  Scheduler->>PG: JobRun = queued, crée tentative et StepRuns + OutboxMessage(job.assigned)
 
   Outbox->>PG: Lit OutboxMessage pending
   Outbox->>MQ: Publie job.assigned (clé worker.{id})
@@ -1140,12 +1165,14 @@ sequenceDiagram
   MQ->>API: Transmet chunks de logs
   API->>UI: SSE logs temps réel
   Worker->>MQ: Publie step.finished (à chaque step)
+  MQ->>Scheduler: Livre step.finished pour la tentative courante
+  Scheduler->>PG: Met à jour son StepRun
   Worker->>FS: Upload artifacts
   Worker->>MQ: Publie job.finished (statut, métadonnées logs/artifacts, consommation)
   Worker->>MQ: ACK du message job.assigned
 
   MQ->>Scheduler: Livre job.finished
-  Scheduler->>PG: Valide et écrit JobRun/StepRuns/Artifacts
+  Scheduler->>PG: Valide et écrit JobRun/JobRunAttempt/Artifacts
   Scheduler->>PG: Libère ressources
   Scheduler->>PG: Débloque jobs dépendants + OutboxMessage(job.assigned)
   Scheduler->>PG: Calcule statut final du PipelineRun
