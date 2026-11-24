@@ -3,7 +3,7 @@ id: ADR-0002
 title: "PostgreSQL conserve l'état de référence, RabbitMQ transporte les messages"
 status: proposed
 topics: [architecture, postgresql, rabbitmq, runtime]
-applies_to: [V0, V1, V2]
+applies_to: [all]
 decided_at: null
 approved_by: []
 supersedes: []

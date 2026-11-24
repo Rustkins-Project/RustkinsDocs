@@ -22,7 +22,7 @@ Une ADR formalise **une décision et ses conséquences**, pas une simple découv
 - Une ADR n'est applicable qu'après **fusion sur main et approbation**. L'approbation d'une réponse Discord seule ne publie pas une ADR.
 - Statuts : `proposed`, `accepted`, `rejected`, `superseded`.
 - Une décision remplacée reste consultable : nouvelle ADR + liens `supersedes`, sans effacement du passé.
-- Le champ `applies_to` permet de distinguer les versions de Rustkins.
+- Le champ `applies_to` permet de distinguer les versions de Rustkins. Pour une décision valable dès V0 et conservée en V1, utiliser `[all]` : son principe reste applicable aux versions futures jusqu'à décision contraire. Une décision introduite plus tard, comme l'outbox V1, garde un périmètre explicite qui n'inclut pas V0.
 
 ## Passage manuel à `accepted`
 

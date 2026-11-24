@@ -3,7 +3,7 @@ id: ADR-0004
 title: "Chaque run référence une version immuable du pipeline"
 status: proposed
 topics: [architecture, pipeline, versioning, git, runtime]
-applies_to: [V0, V1, V2]
+applies_to: [all]
 decided_at: null
 approved_by: []
 supersedes: []
