@@ -1,14 +1,14 @@
 ---
 id: ADR-0003
 title: "Le Scheduler publie ses ordres V1 par outbox transactionnelle"
-status: proposed
+status: accepted
 topics: [architecture, scheduler, rabbitmq, outbox, reliability]
 applies_to: [V1]
-decided_at: null
-approved_by: []
+decided_at: 2026-11-24
+approved_by: ["SNEAXIII"]
 supersedes: []
 related_work_items: []
-references: []
+references: ["https://github.com/Rustkins-Project/RustkinsDocs/pull/23", "https://github.com/Rustkins-Project/RustkinsDocs/pull/23#pullrequestreview-6040622283"]
 ---
 
 # Le Scheduler publie ses ordres V1 par outbox transactionnelle

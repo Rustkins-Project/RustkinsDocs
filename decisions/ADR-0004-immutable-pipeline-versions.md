@@ -1,14 +1,14 @@
 ---
 id: ADR-0004
 title: "Chaque run référence une version immuable du pipeline"
-status: proposed
+status: accepted
 topics: [architecture, pipeline, versioning, git, runtime]
 applies_to: [all]
-decided_at: null
-approved_by: []
+decided_at: 2026-11-24
+approved_by: ["SNEAXIII"]
 supersedes: []
 related_work_items: []
-references: []
+references: ["https://github.com/Rustkins-Project/RustkinsDocs/pull/23", "https://github.com/Rustkins-Project/RustkinsDocs/pull/23#pullrequestreview-6040622283"]
 ---
 
 # Chaque run référence une version immuable du pipeline
