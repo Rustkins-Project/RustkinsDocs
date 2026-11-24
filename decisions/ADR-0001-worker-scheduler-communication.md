@@ -62,4 +62,4 @@ Détails techniques : [V0](../docs/versions/v0/overview.md#9-contrat-de-communic
 
 ## Références de validation
 
-La [PR #18](https://github.com/Rustkins-Project/RustkinsDocs/pull/18), proposée par `SNEAXIII`, a reçu la [review `APPROVED` de `T-Rogier`](https://github.com/Rustkins-Project/RustkinsDocs/pull/18#pullrequestreview-5992533435) le **20 novembre 2026 à 13:18:39, heure de Paris** (`2026-11-20T12:18:39Z`). La review porte sur le dernier commit de la PR (`35f8ed7`) ; celle-ci a été fusionnée le **22 novembre 2026 à 23:02:01, heure de Paris** (`2026-11-22T22:02:01Z`). Le champ `decided_at` conserve la date de la review, conformément au schéma ADR qui accepte une date sans heure.
+La [PR #18](https://github.com/Rustkins-Project/RustkinsDocs/pull/18), proposée par `SNEAXIII`, a reçu la [review `APPROVED` de `T-Rogier`](https://github.com/Rustkins-Project/RustkinsDocs/pull/18#pullrequestreview-5992533435) le **20 novembre 2026**, sur son dernier commit, puis a été fusionnée le **22 novembre 2026**.
