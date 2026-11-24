@@ -2,7 +2,7 @@
 id: DOC-0017
 title: "Rustkins Pipeline Specification v1 (V0 Scope)"
 type: specification
-status: draft
+status: approved
 summary: "Contrat du format de pipeline YAML v1 de Rustkins V0 : déclencheurs, jobs, dépendances, image d'exécution et steps."
 topics: [pipeline, yaml, jobs, triggers]
 applies_to: [V0]

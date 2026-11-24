@@ -1,0 +1,83 @@
+name: Finalize approved ADRs
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      merge_sha:
+        description: Merge commit of the already reviewed PR to finalize
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: adr-finalization-main
+  cancel-in-progress: false
+
+jobs:
+  finalize:
+    name: Record ADR approval
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+      - name: Install validation dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Fetch current main
+        run: git pull --ff-only origin main
+      - name: Read merged PR and record human review
+        id: finalize
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          ADR_MERGE_SHA: ${{ inputs.merge_sha }}
+          ADR_FINALIZER_LOGIN: ${{ vars.ADR_FINALIZER_LOGIN }}
+        run: python scripts/finalize_adrs.py
+      - name: Validate updated documentation
+        if: steps.finalize.outputs.changed == 'true'
+        run: python scripts/validate_docs.py
+      - name: Create finalization commit
+        if: steps.finalize.outputs.changed == 'true'
+        env:
+          PR_NUMBER: ${{ steps.finalize.outputs.pull_number }}
+          MERGE_SHA: ${{ inputs.merge_sha || github.sha }}
+          BOT_LOGIN: ${{ vars.ADR_FINALIZER_LOGIN }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [[ ! "$BOT_LOGIN" =~ ^[A-Za-z0-9-]+$ ]]; then
+            echo 'Missing or invalid ADR_FINALIZER_LOGIN repository variable' >&2
+            exit 1
+          fi
+          BOT_ID=$(gh api "users/${BOT_LOGIN}" --jq .id)
+          git add -- decisions
+          git -c user.name="$BOT_LOGIN" -c user.email="${BOT_ID}+${BOT_LOGIN}@users.noreply.github.com" commit -m "docs(adr): record approved decisions from PR #${PR_NUMBER}"
+          git pull --rebase origin main
+          git merge-base --is-ancestor "$MERGE_SHA" HEAD^
+          while IFS= read -r -d '' file; do
+            if [[ "$(git rev-parse "$MERGE_SHA:$file")" != "$(git rev-parse "HEAD^:$file")" ]]; then
+              echo "ADR changed after the reviewed merge: $file" >&2
+              exit 1
+            fi
+          done < <(git diff --name-only -z HEAD^ HEAD -- decisions)
+          python scripts/validate_docs.py
+      - name: Push finalization commit
+        if: steps.finalize.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.ADR_FINALIZER_TOKEN }}
+        run: |
+          if [[ -z "$GH_TOKEN" ]]; then
+            echo 'Missing ADR_FINALIZER_TOKEN repository secret' >&2
+            exit 1
+          fi
+          gh auth setup-git
+          git push origin HEAD:main

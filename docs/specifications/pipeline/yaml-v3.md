@@ -2,7 +2,7 @@
 id: DOC-0019
 title: "Rustkins Pipeline Specification v3 (V2 Scope)"
 type: specification
-status: draft
+status: approved
 summary: "Format YAML v3 pour Rustkins V2 : secrets, conditions when, matrix, services, cache et environnements de déploiement."
 topics: [pipeline, yaml, secrets, matrix, cache]
 applies_to: [V2]

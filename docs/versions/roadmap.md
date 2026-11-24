@@ -2,7 +2,7 @@
 id: DOC-0022
 title: "Rustkins — Roadmap fonctionnelle par versions"
 type: version
-status: draft
+status: approved
 summary: "Objectifs, périmètres, infrastructures et critères de validation des différentes versions du produit Rustkins."
 topics: [versions, roadmap, scope, infrastructure]
 applies_to: [all]
@@ -35,7 +35,8 @@ Construire le socle du moteur CI.
 * RabbitMQ
 * RustFS
 * Docker local (Docker Engine)
-* Déploiement via Docker Compose
+* Développement via Docker Compose
+* Pilote mononœud via Docker Compose ou Docker Swarm mono-nœud, sans isolation forte des workers
 
 ## Fonctionnalités
 

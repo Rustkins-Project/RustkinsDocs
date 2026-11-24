@@ -2,16 +2,16 @@
 id: DOC-0005
 title: "RabbitMQ Architecture (Rustkins V1)"
 type: architecture
-status: draft
+status: approved
 summary: "Architecture RabbitMQ V1 : échanges, files, transport des ordres de jobs, annulations, logs et publication par outbox."
 topics: [rabbitmq, messaging, outbox, worker]
 applies_to: [V1]
-related_adrs: [ADR-0001]
+related_adrs: [ADR-0001, ADR-0002, ADR-0003]
 ---
 
 # ARCH-02 --- RabbitMQ Architecture (Rustkins V1)
 
-**Status:** Draft (Implementation Reference)
+**Status:** Approved (Implementation Reference)
 
 ------------------------------------------------------------------------
 

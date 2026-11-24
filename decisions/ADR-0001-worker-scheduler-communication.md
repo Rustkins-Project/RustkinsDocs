@@ -1,14 +1,16 @@
 ---
 id: ADR-0001
 title: "Les workers communiquent uniquement avec le Scheduler, sans accès à PostgreSQL"
-status: proposed
+status: accepted
 topics: [architecture, worker, scheduler, rabbitmq, security]
 applies_to: [all]
-decided_at: null
-approved_by: []
+decided_at: 2026-11-20
+approved_by: [T-Rogier]
 supersedes: []
 related_work_items: []
-references: []
+references:
+  - "https://github.com/Rustkins-Project/RustkinsDocs/pull/18"
+  - "https://github.com/Rustkins-Project/RustkinsDocs/pull/18#pullrequestreview-5992533435"
 ---
 
 # Les workers communiquent uniquement avec le Scheduler, sans accès à PostgreSQL
@@ -57,3 +59,7 @@ Les workers continuent d'écrire les logs dans RustFS et, dès la V1, les artifa
 - Le socket Docker donne au worker le contrôle du démon de son hôte. La séparation réseau du conteneur ne suffit pas à isoler PostgreSQL sur un hôte partagé ; une installation de production place les workers et le plan de contrôle sur des hôtes distincts.
 
 Détails techniques : [V0](../docs/versions/v0/overview.md#9-contrat-de-communication-entre-services), [V1](../docs/versions/v1/overview.md#9-contrat-de-communication-entre-services), [ARCH-02](../docs/architecture/components/messaging/02-rabbitmq-architecture.md), [ARCH-09](../docs/architecture/components/worker/09-worker-architecture.md), [ARCH-11](../docs/architecture/components/scheduler/11-scheduler-architecture.md).
+
+## Références de validation
+
+La [PR #18](https://github.com/Rustkins-Project/RustkinsDocs/pull/18), proposée par `SNEAXIII`, a reçu la [review `APPROVED` de `T-Rogier`](https://github.com/Rustkins-Project/RustkinsDocs/pull/18#pullrequestreview-5992533435) le **20 novembre 2026**, sur son dernier commit, puis a été fusionnée le **22 novembre 2026**.

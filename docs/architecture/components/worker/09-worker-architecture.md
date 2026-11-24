@@ -2,7 +2,7 @@
 id: DOC-0011
 title: "Worker Architecture (Rustkins V1)"
 type: architecture
-status: draft
+status: approved
 summary: "Architecture et responsabilités du Worker V1 : récupération Git, exécution Docker, logs, artéfacts et états des jobs."
 topics: [worker, docker, git, execution]
 applies_to: [V1]
@@ -11,7 +11,7 @@ related_adrs: [ADR-0001]
 
 # ARCH-09 --- Worker Architecture (Rustkins V1)
 
-**Status:** Draft (Implementation Reference)
+**Status:** Approved (Implementation Reference)
 
 ------------------------------------------------------------------------
 

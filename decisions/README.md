@@ -8,17 +8,32 @@ Une ADR formalise **une décision et ses conséquences**, pas une simple découv
 
 ## Décisions
 
-| ADR | Titre | Statut |
-| --- | --- | --- |
-| [ADR-0001](ADR-0001-worker-scheduler-communication.md) | Les workers communiquent uniquement avec le Scheduler, sans accès à PostgreSQL | `proposed` |
+| ADR | Titre |
+| --- | --- |
+| [ADR-0001](ADR-0001-worker-scheduler-communication.md) | Les workers communiquent uniquement avec le Scheduler, sans accès à PostgreSQL |
+| [ADR-0002](ADR-0002-postgresql-authoritative-state-rabbitmq-transport.md) | PostgreSQL conserve l'état de référence, RabbitMQ transporte les messages |
+| [ADR-0003](ADR-0003-scheduler-transactional-outbox.md) | Le Scheduler publie ses ordres V1 par outbox transactionnelle |
+| [ADR-0004](ADR-0004-immutable-pipeline-versions.md) | Chaque run référence une version immuable du pipeline |
+
+Le statut à jour est celui du frontmatter de chaque ADR.
 
 ## Gouvernance obligatoire
 
 - Toute **nouvelle ADR ou modification de décision** passe par une Pull Request.
 - **Au moins une approbation humaine d'un autre membre de l'équipe** est requise avant fusion (Timothy, Alexis ou Loick, distinct de l'auteur). L'agent IA ne peut pas approuver.
-- Une ADR n'est applicable qu'après **fusion sur main et approbation**. L'approbation d'une réponse Discord seule ne publie pas une ADR.
+- Une ADR n'est applicable qu'après **fusion sur main, approbation et inscription de `accepted` par le workflow de finalisation**. L'approbation d'une réponse Discord seule ne publie pas une ADR.
 - Statuts : `proposed`, `accepted`, `rejected`, `superseded`.
 - Une décision remplacée reste consultable : nouvelle ADR + liens `supersedes`, sans effacement du passé.
-- Le champ `applies_to` permet de distinguer les versions de Rustkins.
+- Le champ `applies_to` permet de distinguer les versions de Rustkins. Pour une décision valable dès V0 et conservée en V1, utiliser `[all]` : son principe reste applicable aux versions futures jusqu'à décision contraire. Une décision introduite plus tard, comme l'outbox V1, garde un périmètre explicite qui n'inclut pas V0.
 
-**Important :** le texte décrit la politique d'équipe. L'obligation de revue devra être rendue bloquante via les règles de protection GitHub appropriées ; ce changement de configuration n'est pas fait dans cette PR. Il n'existe pas encore d'ADR rétroactive créée automatiquement à partir des documents historiques.
+## Finalisation automatique après fusion
+
+1. L'agent prépare l'ADR avec `status: proposed`, `approved_by: []` et `decided_at: null`. La discussion et les corrections ont lieu sur la PR.
+2. Un autre membre humain de l'équipe approuve le dernier commit de la PR, puis la PR est fusionnée sur `main`. Aucun commit de métadonnées d'approbation n'est demandé au reviewer.
+3. Le workflow [Finalize approved ADRs](../.github/workflows/adr-finalization.yml) retrouve la PR fusionnée et ses reviews GitHub, retient les approbations humaines valides du dernier commit, puis écrit `status: accepted`, les comptes dans `approved_by`, le jour de la dernière approbation (heure de Paris) dans `decided_at` et les liens de preuve dans `references`. Il valide le dépôt et pousse un commit distinct sur `main` avec l'identité du bot.
+
+Si la finalisation échoue, l'ADR reste `proposed` et la décision n'est pas encore publiée. Corriger la cause et relancer le workflow avec le SHA du commit de fusion de la PR. Les champs `approved_by` et `decided_at` facilitent la lecture ; la review GitHub reste la preuve à vérifier. Un agent ne remplit pas lui-même ces champs pour prétendre qu'une décision a été approuvée. Une ADR remplacée reste traçable ; son passage à `superseded` et le lien depuis l'ADR de remplacement restent dans la PR soumise à review.
+
+Le workflow utilise un compte machine GitHub distinct des membres humains. Un administrateur crée manuellement ce compte, active sa double authentification, l'invite dans l'organisation sans l'ajouter à l'équipe des reviewers humains, et lui accorde `Write` sur RustkinsDocs uniquement. Depuis ce compte, créer un jeton personnel à permissions fines limité à RustkinsDocs et à **Contents: Read and write**. Configurer son identifiant dans la variable Actions `ADR_FINALIZER_LOGIN` et son jeton dans le secret Actions `ADR_FINALIZER_TOKEN`, puis ajouter **cet utilisateur uniquement** en bypass `Always allow` du ruleset de `main`. Le jeton ne doit jamais figurer dans le dépôt, une PR ou une discussion. Le ruleset exige une review humaine des chemins `.github/workflows/**`, `scripts/**` et `requirements.txt`, qui contrôlent cette automatisation. Un push effectué avec ce jeton relance la validation sur `main` ; le workflow vérifie aussi les documents avant son push.
+
+Au 24 novembre 2026, le ruleset GitHub actif de `main` exige une approbation de l'équipe Rustkins pour `decisions/**`, `.github/workflows/**`, `scripts/**` et `requirements.txt`, ainsi que le contrôle `Validate documentation`. Il n'impose pas cette approbation à `knowledge/**`. Vérifier la configuration effective sur GitHub si elle change. Les rubriques « ADR-001 » dans les anciens documents d'architecture ne sont pas des ADR approuvées dans `decisions/`.
