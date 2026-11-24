@@ -164,9 +164,17 @@ Stored in:
 WEBHOOK_DELIVERY.external_delivery_id
 ```
 
+The database enforces uniqueness on
+`(webhook_config_id, external_delivery_id)`.
+
 If the delivery already exists:
 
 Webhook is ignored.
+
+For a `push`, WebhookDelivery stores `before_sha` and `after_sha` from
+the pushed reference. The normalized internal event uses `after_sha`
+as its `commit_sha`; a deletion with no executable after SHA creates
+no run.
 
 ------------------------------------------------------------------------
 

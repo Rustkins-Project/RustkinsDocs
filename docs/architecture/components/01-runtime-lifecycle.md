@@ -567,7 +567,8 @@ The following rules MUST always remain true.
 -   One PipelineRun references exactly one PipelineVersion.
 -   PipelineVersion objects are immutable.
 -   One JobRun belongs to exactly one PipelineRun.
--   One StepRun belongs to exactly one JobRun.
+-   One StepRun belongs to exactly one JobRunAttempt and one immutable
+    PipelineVersionStep. Separate attempts retain separate step results.
 -   Scheduler is the only component allowed to enqueue jobs.
 -   Scheduler is the only component allowed to reserve or release worker capacity.
 -   Scheduler orders and control messages are persisted as

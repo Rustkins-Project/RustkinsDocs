@@ -200,10 +200,13 @@ Database stores
 ``` text
 token_prefix
 token_hash
-scopes
+scopes_json
 expires_at
 last_used_at
 ```
+
+`scopes_json` is a JSON array of scope strings. V1 does not require
+separate permission rows for token scopes.
 
 ------------------------------------------------------------------------
 

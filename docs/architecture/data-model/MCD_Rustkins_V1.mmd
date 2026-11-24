@@ -49,7 +49,7 @@ erDiagram
         string name
         string token_prefix
         string token_hash
-        string scopes
+        jsonb scopes_json
         bool revoked
         datetime created_at
         datetime expires_at
@@ -72,7 +72,8 @@ erDiagram
         uuid webhook_config_id FK
         string external_delivery_id
         string event_type
-        string commit_sha
+        string before_sha
+        string after_sha
         string branch
         string status
         string error_message
@@ -96,6 +97,7 @@ erDiagram
         string git_sha
         string yaml_hash
         text yaml_content
+        int specification_version
         string validation_status
         json validation_errors_json
         datetime created_at
@@ -138,6 +140,7 @@ erDiagram
         uuid pipeline_id FK
         uuid pipeline_version_id FK
         uuid triggered_by_user_id FK
+        uuid triggered_by_api_token_id FK
         uuid webhook_delivery_id FK
         uuid cancelled_by_user_id FK
         string trigger_type
@@ -184,16 +187,18 @@ erDiagram
         int attempt_number
         uuid start_request_id
         string status
+        int exit_code
         string error_message
         float cpu_seconds
         int memory_peak_mb
+        datetime created_at
         datetime started_at
         datetime finished_at
     }
 
     STEP_RUN {
         uuid id PK
-        uuid job_run_id FK
+        uuid job_run_attempt_id FK
         uuid pipeline_version_step_id FK
         string status
         int exit_code
@@ -262,7 +267,9 @@ erDiagram
         uuid pipeline_run_id FK
         uuid job_run_id FK
         string event_type
+        string severity
         string message
+        jsonb payload_json
         datetime created_at
     }
 
@@ -288,9 +295,10 @@ erDiagram
     PROJECT ||--o{ PROJECT_MEMBER : has
     PROJECT ||--o{ API_TOKEN : owns
     PROJECT ||--o{ WEBHOOK_CONFIG : owns
+    PROJECT ||--o{ WEBHOOK_DELIVERY : receives
     PROJECT ||--o{ PIPELINE : owns
     PROJECT ||--o{ PIPELINE_RUN : has
-    PROJECT ||--o{ ARTIFACT_RETENTION_POLICY : defines
+    PROJECT ||--o| ARTIFACT_RETENTION_POLICY : defines
 
     WEBHOOK_CONFIG ||--o{ WEBHOOK_DELIVERY : receives
 
@@ -304,15 +312,16 @@ erDiagram
 
     PIPELINE_VERSION ||--o{ PIPELINE_RUN : used_by
 
-    USER ||--o{ PIPELINE_RUN : triggers
-    USER ||--o{ PIPELINE_RUN : cancels
+    USER o|--o{ PIPELINE_RUN : triggers
+    API_TOKEN o|--o{ PIPELINE_RUN : triggers
+    USER o|--o{ PIPELINE_RUN : cancels
 
-    WEBHOOK_DELIVERY ||--o{ PIPELINE_RUN : triggers
+    WEBHOOK_DELIVERY o|--o{ PIPELINE_RUN : triggers
 
     PIPELINE_RUN ||--o{ JOB_RUN : contains
     PIPELINE_VERSION_JOB ||--o{ JOB_RUN : instantiated_by
 
-    JOB_RUN ||--o{ STEP_RUN : contains
+    JOB_RUN_ATTEMPT ||--o{ STEP_RUN : contains
     PIPELINE_VERSION_STEP ||--o{ STEP_RUN : instantiated_by
 
     JOB_RUN ||--o{ JOB_RUN_DEPENDENCY : has
@@ -330,7 +339,20 @@ erDiagram
     JOB_RUN ||--o{ ARTIFACT : produces
 
     PIPELINE_RUN ||--o{ RUN_EVENT : has
-    JOB_RUN ||--o{ RUN_EVENT : concerns
+    JOB_RUN o|--o{ RUN_EVENT : concerns
 
-    PIPELINE_RUN ||--o{ OUTBOX_MESSAGE : emits
-    JOB_RUN ||--o{ OUTBOX_MESSAGE : dispatches
+    PIPELINE_RUN o|--o{ OUTBOX_MESSAGE : emits
+    JOB_RUN o|--o{ OUTBOX_MESSAGE : dispatches
+
+    %% Relational uniqueness constraints enforced by PostgreSQL:
+    %% PROJECT_MEMBER: UNIQUE(project_id, user_id)
+    %% WEBHOOK_DELIVERY: UNIQUE(webhook_config_id, external_delivery_id)
+    %% PIPELINE_VERSION_JOB: UNIQUE(pipeline_version_id, job_key)
+    %% PIPELINE_VERSION_STEP: UNIQUE(pipeline_version_job_id, step_key)
+    %% PIPELINE_VERSION_STEP: UNIQUE(pipeline_version_job_id, order_index)
+    %% PIPELINE_VERSION_JOB_DEPENDENCY: UNIQUE(pipeline_version_job_id, depends_on_pipeline_version_job_id)
+    %% JOB_RUN: UNIQUE(pipeline_run_id, pipeline_version_job_id)
+    %% JOB_RUN_ATTEMPT: UNIQUE(job_run_id, attempt_number)
+    %% JOB_RUN_DEPENDENCY: UNIQUE(job_run_id, depends_on_job_run_id)
+    %% STEP_RUN: UNIQUE(job_run_attempt_id, pipeline_version_step_id)
+    %% ARTIFACT_RETENTION_POLICY: UNIQUE(project_id)
