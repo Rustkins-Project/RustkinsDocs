@@ -77,9 +77,10 @@ def reviewed_adrs(github: GitHub, number: int):
     ]
 
 
-def valid_approvals(reviews: list[dict], head_sha: str, author: str):
+def valid_approvals(reviews: list[dict], head_sha: str, author: str, excluded_logins=()):
     """Keep the latest decisive review per human on the final PR head."""
     by_reviewer = {}
+    excluded = {login.casefold() for login in excluded_logins}
     for review in reviews:
         user = review.get("user") or {}
         login = user.get("login")
@@ -87,6 +88,7 @@ def valid_approvals(reviews: list[dict], head_sha: str, author: str):
             user.get("type") != "User"
             or not isinstance(login, str)
             or login.casefold() == author.casefold()
+            or login.casefold() in excluded
             or review.get("commit_id") != head_sha
         ):
             continue
@@ -170,7 +172,12 @@ def main():
     if not pull.get("merged_at") or pull.get("merge_commit_sha") != sha:
         raise ValueError(f"PR #{number} : fusion non vérifiée")
     reviews = list(github.pages(f"pulls/{number}/reviews"))
-    approvals = valid_approvals(reviews, pull["head"]["sha"], pull["user"]["login"])
+    approvals = valid_approvals(
+        reviews,
+        pull["head"]["sha"],
+        pull["user"]["login"],
+        [os.environ.get("ADR_FINALIZER_LOGIN", "")],
+    )
     if not approvals:
         raise ValueError(f"PR #{number} : aucune approbation humaine du dernier commit")
 

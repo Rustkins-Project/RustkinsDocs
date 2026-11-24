@@ -43,12 +43,14 @@ def test_accepts_only_current_human_approvals_and_records_paris_date():
             review("author"),
             review("bot[bot]", kind="Bot"),
             review("stale", sha="old"),
+            review("machine-user"),
             review("retracted", date="2026-11-24T20:00:00Z"),
             review("retracted", state="CHANGES_REQUESTED", date="2026-11-24T21:00:00Z"),
             review("Alexis"),
         ],
         "head",
         "author",
+        ["machine-user"],
     )
     assert [item["user"]["login"] for item in approvals] == ["Alexis"]
 
