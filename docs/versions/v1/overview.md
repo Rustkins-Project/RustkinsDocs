@@ -2,7 +2,7 @@
 id: DOC-0024
 title: "Rustkins — Récapitulatif détaillé V1"
 type: version
-status: draft
+status: approved
 summary: "Périmètre de Rustkins V1 : usage en équipe, authentification, webhooks, scheduling, logs temps réel et artéfacts."
 topics: [V1, teams, webhooks, scheduling]
 applies_to: [V1]

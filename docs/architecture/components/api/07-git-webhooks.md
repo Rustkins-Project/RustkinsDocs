@@ -2,7 +2,7 @@
 id: DOC-0003
 title: "Git Webhooks (Rustkins V1)"
 type: architecture
-status: draft
+status: approved
 summary: "Réception des webhooks Git, validation des signatures HMAC, déclenchement des pipelines et protection contre les doublons."
 topics: [webhooks, git, api, security]
 applies_to: [V1]
@@ -10,7 +10,7 @@ applies_to: [V1]
 
 # ARCH-07 --- Git Webhooks (Rustkins V1)
 
-**Status:** Draft (Implementation Reference)
+**Status:** Approved (Implementation Reference)
 
 ------------------------------------------------------------------------
 

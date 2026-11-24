@@ -2,7 +2,7 @@
 id: DOC-0021
 title: "Rustkins — Inventaire des features par coût d'implémentation"
 type: version
-status: draft
+status: approved
 summary: "Inventaire des fonctionnalités du moteur CI/CD, regroupées selon leur coût estimé et leur complexité d'implémentation."
 topics: [features, roadmap, complexity]
 applies_to: [all]

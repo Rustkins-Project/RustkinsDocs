@@ -2,7 +2,7 @@
 id: DOC-0041
 title: "Cahier des charges — validation documentaire et CI de RustkinsDocs"
 type: specification
-status: draft
+status: approved
 summary: "Spécification d'implémentation du validateur Python, des schémas, des contrôles Markdown et de la CI GitHub Actions pour RustkinsDocs."
 topics: [documentation, validation, ci, github-actions, python, governance]
 applies_to: [all]

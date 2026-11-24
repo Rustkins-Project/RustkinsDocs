@@ -2,7 +2,7 @@
 id: DOC-0018
 title: "Rustkins Pipeline Specification v2 (V1 Scope)"
 type: specification
-status: draft
+status: approved
 summary: "Format YAML v2 pour Rustkins V1 : variables, déclenchement API, ressources, artéfacts, run_if et retry après perte du Worker."
 topics: [pipeline, yaml, resources, artifacts, retry]
 applies_to: [V1]

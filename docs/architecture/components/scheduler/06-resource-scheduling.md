@@ -2,7 +2,7 @@
 id: DOC-0007
 title: "Resource Scheduling (Rustkins V1)"
 type: architecture
-status: draft
+status: approved
 summary: "Allocation et réservation de CPU et mémoire pour répartir les jobs entre workers sans dépasser leurs capacités."
 topics: [scheduler, resources, worker, cpu, memory]
 applies_to: [V1]
@@ -11,7 +11,7 @@ related_adrs: [ADR-0001]
 
 # ARCH-06 --- Resource Scheduling (Rustkins V1)
 
-**Status:** Draft (Implementation Reference)
+**Status:** Approved (Implementation Reference)
 
 ------------------------------------------------------------------------
 

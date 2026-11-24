@@ -2,7 +2,7 @@
 id: DOC-0023
 title: "Rustkins — Récapitulatif détaillé V0"
 type: version
-status: draft
+status: approved
 summary: "Périmètre et fonctionnement de Rustkins V0 : moteur CI local, DAG, exécution Docker, persistance et interface."
 topics: [V0, pipeline, docker, runtime]
 applies_to: [V0]
