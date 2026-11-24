@@ -10,7 +10,7 @@ Une ADR formalise **une décision et ses conséquences**, pas une simple découv
 
 | ADR | Titre | Statut |
 | --- | --- | --- |
-| [ADR-0001](ADR-0001-worker-scheduler-communication.md) | Les workers communiquent uniquement avec le Scheduler, sans accès à PostgreSQL | `proposed` |
+| [ADR-0001](ADR-0001-worker-scheduler-communication.md) | Les workers communiquent uniquement avec le Scheduler, sans accès à PostgreSQL | `accepted` (PR #18) |
 | [ADR-0002](ADR-0002-postgresql-authoritative-state-rabbitmq-transport.md) | PostgreSQL conserve l'état de référence, RabbitMQ transporte les messages | `proposed` |
 | [ADR-0003](ADR-0003-scheduler-transactional-outbox.md) | Le Scheduler publie ses ordres V1 par outbox transactionnelle | `proposed` |
 | [ADR-0004](ADR-0004-immutable-pipeline-versions.md) | Chaque run référence une version immuable du pipeline | `proposed` |
