@@ -6,7 +6,7 @@ status: draft
 summary: "Architecture RabbitMQ V1 : échanges, files, transport des ordres de jobs, annulations, logs et publication par outbox."
 topics: [rabbitmq, messaging, outbox, worker]
 applies_to: [V1]
-related_adrs: [ADR-0001]
+related_adrs: [ADR-0001, ADR-0002, ADR-0003]
 ---
 
 # ARCH-02 --- RabbitMQ Architecture (Rustkins V1)

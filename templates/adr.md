@@ -19,7 +19,7 @@ Décrire le problème, le périmètre, les contraintes et les objectifs.
 
 ## Décision
 
-Décrire précisément le choix envisagé. Ne pas annoncer une décision acceptée avant **approbation humaine par au moins un autre membre de l'équipe** et fusion sur `main`.
+Décrire précisément le choix envisagé. L'agent conserve `proposed`, `approved_by: []` et `decided_at: null`. Avant l'approbation finale de la PR, un humain fait le commit de finalisation décrit dans `decisions/README.md`. La décision n'est applicable qu'après approbation humaine par un autre membre de l'équipe et fusion sur `main`.
 
 ## Alternatives
 

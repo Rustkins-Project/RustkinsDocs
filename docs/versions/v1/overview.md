@@ -6,7 +6,7 @@ status: draft
 summary: "Périmètre de Rustkins V1 : usage en équipe, authentification, webhooks, scheduling, logs temps réel et artéfacts."
 topics: [V1, teams, webhooks, scheduling]
 applies_to: [V1]
-related_adrs: [ADR-0001]
+related_adrs: [ADR-0001, ADR-0002, ADR-0003, ADR-0004]
 ---
 
 # Rustkins — Récapitulatif détaillé V1

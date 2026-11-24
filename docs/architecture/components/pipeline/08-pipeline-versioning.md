@@ -6,6 +6,7 @@ status: draft
 summary: "Modèle de versions immuables des pipelines, historique des définitions et association des runs à une révision Git."
 topics: [pipeline, versioning, git, runtime]
 applies_to: [V1]
+related_adrs: [ADR-0004]
 ---
 
 # ARCH-08 --- Pipeline Versioning (Rustkins V1)

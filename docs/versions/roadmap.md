@@ -35,7 +35,8 @@ Construire le socle du moteur CI.
 * RabbitMQ
 * RustFS
 * Docker local (Docker Engine)
-* Déploiement via Docker Compose
+* Développement via Docker Compose
+* Pilote mononœud via Docker Compose ou Docker Swarm mono-nœud, sans isolation forte des workers
 
 ## Fonctionnalités
 

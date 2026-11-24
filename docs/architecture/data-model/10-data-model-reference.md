@@ -6,6 +6,7 @@ status: draft
 summary: "Sémantique et relations des entités Rustkins V1 : identité, configuration des pipelines et exécution des runs."
 topics: [data-model, postgresql, pipeline, runtime]
 applies_to: [V1]
+related_adrs: [ADR-0001, ADR-0002, ADR-0003, ADR-0004]
 ---
 
 # ARCH-10 --- Data Model Reference (Rustkins V1)

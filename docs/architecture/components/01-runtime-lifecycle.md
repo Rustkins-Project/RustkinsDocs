@@ -6,6 +6,7 @@ status: draft
 summary: "Cycle de vie des exécutions Rustkins V1, de la création des runs à leur ordonnancement et exécution par les workers."
 topics: [runtime, scheduler, worker, pipeline]
 applies_to: [V1]
+related_adrs: [ADR-0001, ADR-0002, ADR-0003, ADR-0004]
 ---
 
 # ARCH-01 --- Runtime & Execution Lifecycle (Rustkins V1)
