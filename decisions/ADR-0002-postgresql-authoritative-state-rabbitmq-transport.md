@@ -15,9 +15,9 @@ references: []
 
 ## Contexte
 
-Les demandes de run, l'état du DAG et les résultats doivent rester consultables après une panne ou un redémarrage de RabbitMQ. Le broker livre des ordres et des événements de manière asynchrone ; sa file ne constitue pas un historique fiable des transitions métier. Les vues V0 et V1 ainsi que la spécification YAML v3 décrivent PostgreSQL comme source de vérité de l'exécution, mais ce choix n'a pas encore été approuvé dans une ADR.
+Les demandes de run, l'état du DAG et les résultats doivent rester consultables après une panne ou un redémarrage de RabbitMQ. Le broker livre des ordres et des événements de manière asynchrone ; sa file ne constitue pas un historique fiable des transitions métier. Les vues V0 et V1 ainsi que la spécification YAML v3 décrivent PostgreSQL comme source de vérité de l'exécution.
 
-Cette proposition concerne la responsabilité des deux systèmes. La frontière de confiance des Workers et la propriété des écritures d'exécution sont traitées dans [ADR-0001](ADR-0001-worker-scheduler-communication.md).
+Cette ADR concerne la responsabilité des deux systèmes. La frontière de confiance des Workers et la propriété des écritures d'exécution sont traitées dans [ADR-0001](ADR-0001-worker-scheduler-communication.md).
 
 ## Décision
 
@@ -34,7 +34,7 @@ Les garanties de publication des ordres du Scheduler en V1 font l'objet d'[ADR-0
 - **PostgreSQL seul avec scrutation, sans broker** : simplifierait l'infrastructure mais reporterait le transport et la réactivité des échanges sur la base.
 - **État durable propre à chaque Worker** : compliquerait la reprise et la coordination et élargirait la frontière de confiance décrite dans ADR-0001.
 
-Ces alternatives explicitent l'arbitrage proposé ; les documents historiques ne prouvent pas qu'elles ont déjà été formellement rejetées par l'équipe.
+Ces alternatives explicitent l'arbitrage ; les documents historiques ne prouvent pas qu'elles avaient déjà été formellement rejetées par l'équipe.
 
 ## Conséquences
 

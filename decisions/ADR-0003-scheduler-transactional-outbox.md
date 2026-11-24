@@ -15,7 +15,7 @@ references: []
 
 ## Contexte
 
-En V1, le Scheduler doit faire évoluer l'état d'un job dans PostgreSQL et envoyer à un Worker l'ordre correspondant. Une écriture en base suivie d'une publication directe dans RabbitMQ laisse une fenêtre où la base est mise à jour mais où aucun ordre n'est livré. Une publication avant le commit crée le risque inverse. La V0 décrit une publication directe avec mécanismes de réconciliation ; elle ne possède pas de table d'outbox. Cette ADR propose la garantie supplémentaire prévue par l'architecture V1.
+En V1, le Scheduler doit faire évoluer l'état d'un job dans PostgreSQL et envoyer à un Worker l'ordre correspondant. Une écriture en base suivie d'une publication directe dans RabbitMQ laisse une fenêtre où la base est mise à jour mais où aucun ordre n'est livré. Une publication avant le commit crée le risque inverse. La V0 décrit une publication directe avec mécanismes de réconciliation ; elle ne possède pas de table d'outbox. L'architecture V1 prévoit une garantie supplémentaire.
 
 ## Décision
 
@@ -32,7 +32,7 @@ Cette décision complète [ADR-0002](ADR-0002-postgresql-authoritative-state-rab
 - **Publication avant commit** : un Worker pourrait recevoir un ordre pour un état qui n'a finalement pas été validé.
 - **Transaction distribuée entre PostgreSQL et RabbitMQ** : complexité opérationnelle supérieure pour un besoin couvert par outbox et idempotence.
 
-Ces options décrivent le compromis proposé, sans leur attribuer une validation ou un rejet historique non documenté.
+Ces options décrivent le compromis, sans leur attribuer une validation ou un rejet historique non documenté.
 
 ## Conséquences
 

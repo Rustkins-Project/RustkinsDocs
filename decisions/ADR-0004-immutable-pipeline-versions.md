@@ -15,7 +15,7 @@ references: []
 
 ## Contexte
 
-Le fichier YAML d'un dépôt change au fil des commits. Relire sa version courante pour expliquer un ancien run fausserait l'historique et pourrait modifier l'interprétation de ses jobs lors d'un retry. Les vues V0/V1 et l'architecture du versionnement décrivent un instantané `PipelineVersion` lié au SHA Git ; la spécification YAML v3 conserve ce principe. Ces documents sont encore `draft` et ne prouvent pas une approbation d'ADR.
+Le fichier YAML d'un dépôt change au fil des commits. Relire sa version courante pour expliquer un ancien run fausserait l'historique et pourrait modifier l'interprétation de ses jobs lors d'un retry. Les vues V0/V1 et l'architecture du versionnement décrivent un instantané `PipelineVersion` lié au SHA Git ; la spécification YAML v3 conserve ce principe.
 
 ## Décision
 
@@ -30,7 +30,7 @@ Le fichier YAML d'un dépôt change au fil des commits. Relire sa version couran
 - **Copier toute la définition dans chaque `PipelineRun` sans version partagée** : préserverait un instantané, au prix d'une duplication et de relations moins explicites entre runs identiques.
 - **Stocker seulement le SHA Git** : imposerait de retrouver le dépôt et son contenu pour interpréter chaque ancien run.
 
-Ces alternatives motivent la proposition ; leur rejet par l'équipe reste à confirmer pendant la review.
+Ces alternatives expliquent le choix et ses conséquences.
 
 ## Conséquences
 

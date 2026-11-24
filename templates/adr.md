@@ -19,7 +19,7 @@ Décrire le problème, le périmètre, les contraintes et les objectifs.
 
 ## Décision
 
-Décrire précisément le choix envisagé. L'agent conserve `proposed`, `approved_by: []` et `decided_at: null`. Avant l'approbation finale de la PR, un humain fait le commit de finalisation décrit dans `decisions/README.md`. La décision n'est applicable qu'après approbation humaine par un autre membre de l'équipe et fusion sur `main`.
+Décrire précisément le choix envisagé. L'agent conserve `proposed`, `approved_by: []` et `decided_at: null`. Après review humaine et fusion de la PR, le workflow décrit dans `decisions/README.md` inscrit l'approbation. La décision est applicable quand son statut `accepted` est publié sur `main`.
 
 ## Alternatives
 

@@ -1,0 +1,76 @@
+name: Finalize approved ADRs
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      merge_sha:
+        description: Merge commit of the already reviewed PR to finalize
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: adr-finalization-main
+  cancel-in-progress: false
+
+jobs:
+  finalize:
+    name: Record ADR approval
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+      - name: Install validation dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Fetch current main
+        run: git pull --ff-only origin main
+      - name: Read merged PR and record human review
+        id: finalize
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          ADR_MERGE_SHA: ${{ inputs.merge_sha }}
+        run: python scripts/finalize_adrs.py
+      - name: Validate updated documentation
+        if: steps.finalize.outputs.changed == 'true'
+        run: python scripts/validate_docs.py
+      - name: Create finalization commit
+        if: steps.finalize.outputs.changed == 'true'
+        env:
+          PR_NUMBER: ${{ steps.finalize.outputs.pull_number }}
+        run: |
+          git add -- decisions
+          git -c user.name='Rustkins ADR automation' -c user.email='adr-automation@users.noreply.github.com' commit -m "docs(adr): record approved decisions from PR #${PR_NUMBER}"
+          git pull --rebase origin main
+          python scripts/validate_docs.py
+      - name: Create limited GitHub App token
+        if: steps.finalize.outputs.changed == 'true'
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          client-id: ${{ vars.ADR_FINALIZER_CLIENT_ID }}
+          private-key: ${{ secrets.ADR_FINALIZER_PRIVATE_KEY }}
+          permission-contents: write
+      - name: Push finalization commit
+        if: steps.finalize.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
+        run: |
+          BOT_ID=$(gh api "users/${APP_SLUG}[bot]" --jq .id)
+          git config user.name "${APP_SLUG}[bot]"
+          git config user.email "${BOT_ID}+${APP_SLUG}[bot]@users.noreply.github.com"
+          git commit --amend --no-edit --reset-author
+          gh auth setup-git
+          git push origin HEAD:main
